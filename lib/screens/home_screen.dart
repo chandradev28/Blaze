@@ -19,7 +19,7 @@ class HomeScreen extends StatelessWidget {
       builder: (context, _) {
         final theme = controller.activeTheme;
         final result = controller.latestResult;
-        final value = _gaugeValue(theme.maxSpeed, controller);
+        final value = _gaugeValue(controller);
         return Container(
           color: Colors.black,
           child: SafeArea(
@@ -56,6 +56,7 @@ class HomeScreen extends StatelessWidget {
                           (controller.phase == TestPhase.upload ? value : null),
                       ping: result?.ping,
                       jitter: result?.jitter,
+                      scaleMax: controller.dialMax,
                       height: 350),
                   const SizedBox(height: 4),
                   _StartButton(controller: controller),
@@ -110,19 +111,16 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  double _gaugeValue(int maxSpeed, BlazeController controller) {
+  double _gaugeValue(BlazeController controller) {
     final result = controller.latestResult;
     switch (controller.phase) {
       case TestPhase.download:
-        return maxSpeed * controller.gaugeValue;
       case TestPhase.upload:
-        return maxSpeed * controller.gaugeValue * 0.76;
       case TestPhase.ping:
-        return maxSpeed * 0.06 * controller.gaugeValue;
-      case TestPhase.finished:
-        return result?.download.clamp(0, maxSpeed).toDouble() ?? 0;
       case TestPhase.connecting:
-        return maxSpeed * 0.025 * controller.gaugeValue;
+        return controller.liveSpeed;
+      case TestPhase.finished:
+        return result?.download ?? controller.liveSpeed;
       case TestPhase.error:
       case TestPhase.idle:
         return 0;
@@ -331,7 +329,7 @@ class _ResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final shareText =
-        'Blaze result — ${result.download.toStringAsFixed(1)} Mbps down, ${result.upload.toStringAsFixed(1)} Mbps up, ${result.ping.toStringAsFixed(0)} ms ping. ${result.quality} connection.';
+        'Blaze result — ${result.download.toStringAsFixed(1)} MBps down, ${result.upload.toStringAsFixed(1)} MBps up, ${result.ping.toStringAsFixed(0)} ms ping. ${result.quality} connection.';
     return BlazeCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -364,11 +362,11 @@ class _ResultCard extends StatelessWidget {
             MetricTile(
                 label: 'Download',
                 value: result.download.toStringAsFixed(1),
-                unit: 'Mbps'),
+                unit: 'MBps'),
             MetricTile(
                 label: 'Upload',
                 value: result.upload.toStringAsFixed(1),
-                unit: 'Mbps'),
+                unit: 'MBps'),
             MetricTile(
                 label: 'Ping',
                 value: result.ping.toStringAsFixed(0),

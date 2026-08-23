@@ -138,11 +138,11 @@ class _SummaryCard extends StatelessWidget {
           const SizedBox(height: 14),
           Row(children: [
             MetricTile(
-                label: 'Best', value: best.toStringAsFixed(1), unit: 'Mbps'),
+                label: 'Best', value: best.toStringAsFixed(1), unit: 'MBps'),
             MetricTile(
                 label: 'Average',
                 value: average.toStringAsFixed(1),
-                unit: 'Mbps'),
+                unit: 'MBps'),
             MetricTile(
                 label: 'Runs',
                 value: '${controller.history.length}',
@@ -190,7 +190,7 @@ class _HistoryTile extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('${result.download.toStringAsFixed(1)} Mbps',
+              Text('${result.download.toStringAsFixed(1)} MBps',
                   style: TextStyle(
                       color: theme.secondary, fontWeight: FontWeight.w900)),
               Text('${result.ping.toStringAsFixed(0)} ms ping',
@@ -200,7 +200,7 @@ class _HistoryTile extends StatelessWidget {
           ),
           IconButton(
               onPressed: () => Share.share(
-                  'Blaze result — ${result.download.toStringAsFixed(1)} Mbps down, ${result.upload.toStringAsFixed(1)} Mbps up, ${result.ping.toStringAsFixed(0)} ms ping.'),
+                  'Blaze result — ${result.download.toStringAsFixed(1)} MBps down, ${result.upload.toStringAsFixed(1)} MBps up, ${result.ping.toStringAsFixed(0)} ms ping.'),
               icon: const Icon(Icons.ios_share_rounded, size: 18)),
         ],
       ),

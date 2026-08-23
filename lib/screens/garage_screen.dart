@@ -57,7 +57,8 @@ class _GarageScreenState extends State<GarageScreen> {
                               child: BlazeGauge(
                                   theme: _draft,
                                   value: _draft.maxSpeed * 0.64,
-                                  phase: TestPhase.download)),
+                                  phase: TestPhase.download,
+                                  scaleMax: _draft.maxSpeed.toDouble())),
                           Text(_draft.name,
                               style: const TextStyle(
                                   fontSize: 18, fontWeight: FontWeight.w900)),
@@ -136,12 +137,12 @@ class _GarageScreenState extends State<GarageScreen> {
                       child: Column(
                         children: [
                           _SliderRow(
-                            label: 'Speed scale',
-                            valueLabel: '${_draft.maxSpeed} Mbps',
+                            label: 'Preview scale',
+                            valueLabel: '${_draft.maxSpeed} MBps',
                             value: _draft.maxSpeed.toDouble(),
-                            min: 500,
-                            max: 5000,
-                            divisions: 9,
+                            min: 10,
+                            max: 1000,
+                            divisions: 99,
                             onChanged: (value) => _update(
                                 _draft.copyWith(maxSpeed: value.round())),
                           ),

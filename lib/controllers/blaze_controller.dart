@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,8 +24,16 @@ class BlazeController extends ChangeNotifier {
   SpeedResult? latestResult;
   TestPhase phase = TestPhase.idle;
   double gaugeValue = 0;
+  double liveSpeed = 0;
+  double peakSpeed = 0;
   String? errorMessage;
   DateTime? _lastProgressNotify;
+
+  double get dialMax {
+    final observed = math.max(liveSpeed, peakSpeed);
+    if (observed <= 0) return 25;
+    return _niceCeiling(math.max(observed * 1.25, 1));
+  }
 
   bool get isTesting =>
       phase != TestPhase.idle &&
@@ -97,6 +106,8 @@ class BlazeController extends ChangeNotifier {
     if (isTesting) return;
     errorMessage = null;
     gaugeValue = 0;
+    liveSpeed = 0;
+    peakSpeed = 0;
     _lastProgressNotify = null;
     latestResult = null;
     phase = TestPhase.connecting;
@@ -106,12 +117,23 @@ class BlazeController extends ChangeNotifier {
         onPhase: (nextPhase) {
           phase = nextPhase;
           gaugeValue = 0;
+          if (nextPhase == TestPhase.connecting ||
+              nextPhase == TestPhase.ping ||
+              nextPhase == TestPhase.download ||
+              nextPhase == TestPhase.upload) {
+            liveSpeed = 0;
+            peakSpeed = 0;
+          }
           notifyListeners();
         },
         onProgress: (progress) {
-          gaugeValue = progress;
+          gaugeValue = progress.fraction;
+          if (progress.speedMBps > 0) {
+            liveSpeed = progress.speedMBps;
+            peakSpeed = math.max(peakSpeed, progress.speedMBps);
+          }
           final now = DateTime.now();
-          if (progress < 1 &&
+          if (progress.fraction < 1 &&
               _lastProgressNotify != null &&
               now.difference(_lastProgressNotify!).inMilliseconds < 42) {
             return;
@@ -121,6 +143,8 @@ class BlazeController extends ChangeNotifier {
         },
       );
       latestResult = result;
+      liveSpeed = result.download;
+      peakSpeed = math.max(peakSpeed, result.download);
       history = [result, ...history].take(20).toList();
       phase = TestPhase.finished;
       _persistHistory();
@@ -137,8 +161,28 @@ class BlazeController extends ChangeNotifier {
   void resetTest() {
     phase = TestPhase.idle;
     gaugeValue = 0;
+    liveSpeed = 0;
+    peakSpeed = 0;
     errorMessage = null;
     notifyListeners();
+  }
+
+  double _niceCeiling(double value) {
+    final magnitude = math
+        .pow(
+          10,
+          (math.log(value) / math.log(10)).floor(),
+        )
+        .toDouble();
+    final normalized = value / magnitude;
+    final multiplier = normalized <= 1
+        ? 1
+        : normalized <= 2
+            ? 2
+            : normalized <= 5
+                ? 5
+                : 10;
+    return multiplier * magnitude;
   }
 
   Future<void> _persistThemes() async {

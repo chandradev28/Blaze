@@ -6,6 +6,13 @@ import '../models/speed_result.dart';
 
 enum TestPhase { idle, connecting, ping, download, upload, finished, error }
 
+class SpeedTestProgress {
+  const SpeedTestProgress({required this.fraction, required this.speedMBps});
+
+  final double fraction;
+  final double speedMBps;
+}
+
 class SpeedTestException implements Exception {
   const SpeedTestException(this.message);
 
@@ -20,6 +27,8 @@ class SpeedTestService {
 
   // This ramp-up follows the same principle as mature speed-test engines:
   // measure several request sizes concurrently instead of trusting one file.
+  // Progress reports expose aggregate decimal megabytes per second while the
+  // final result uses the complete batch elapsed time.
   static const _downloadPlan = [
     2 * 1024 * 1024,
     4 * 1024 * 1024,
@@ -33,7 +42,7 @@ class SpeedTestService {
 
   Future<SpeedResult> run({
     required void Function(TestPhase phase) onPhase,
-    required void Function(double progress) onProgress,
+    required void Function(SpeedTestProgress progress) onProgress,
   }) async {
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 10)
@@ -67,8 +76,8 @@ class SpeedTestService {
       onPhase(TestPhase.finished);
       return SpeedResult(
         timestamp: DateTime.now(),
-        download: downloadBatch.mbps,
-        upload: uploadBatch.mbps,
+        download: downloadBatch.megabytesPerSecond,
+        upload: uploadBatch.megabytesPerSecond,
         ping: ping,
         jitter: jitter,
         server: metadata['colo']?.toString() ?? 'Cloudflare edge',
@@ -100,7 +109,7 @@ class SpeedTestService {
 
   Future<List<double>> _measurePing(
     HttpClient client,
-    void Function(double progress) onProgress,
+    void Function(SpeedTestProgress progress) onProgress,
   ) async {
     final samples = <double>[];
     // Ignore the first request as a connection warm-up. Eight samples leave
@@ -118,7 +127,7 @@ class SpeedTestService {
             'The test server rejected the latency check.');
       }
       if (index > 0) samples.add(watch.elapsedMicroseconds / 1000);
-      onProgress((index + 1) / 8);
+      onProgress(SpeedTestProgress(fraction: (index + 1) / 8, speedMBps: 0));
     }
     if (samples.length < 3) {
       throw const SpeedTestException(
@@ -131,7 +140,7 @@ class SpeedTestService {
     HttpClient client, {
     required _Direction direction,
     required List<int> plan,
-    required void Function(double progress) onProgress,
+    required void Function(SpeedTestProgress progress) onProgress,
   }) async {
     final expectedBytes = plan.fold<int>(0, (sum, bytes) => sum + bytes);
     var completedBytes = 0;
@@ -139,7 +148,12 @@ class SpeedTestService {
 
     void reportProgress([int delta = 0]) {
       completedBytes += delta;
-      onProgress((completedBytes / expectedBytes).clamp(0.0, 1.0));
+      final elapsedSeconds =
+          math.max(wallClock.elapsedMicroseconds / 1000000, 0.001);
+      onProgress(SpeedTestProgress(
+        fraction: (completedBytes / expectedBytes).clamp(0.0, 1.0),
+        speedMBps: completedBytes / elapsedSeconds / 1000000,
+      ));
     }
 
     final measurements = await Future.wait(
@@ -164,11 +178,16 @@ class SpeedTestService {
           'The test completed too quickly to produce a reliable result.');
     }
 
-    onProgress(1);
     final seconds = math.max(wallClock.elapsedMicroseconds / 1000000, 0.001);
-    final mbps = (totalBytes * 8 / seconds) / 1000000;
+    final megabytesPerSecond = totalBytes / seconds / 1000000;
+    onProgress(SpeedTestProgress(
+      fraction: 1,
+      speedMBps: megabytesPerSecond,
+    ));
     return _BatchResult(
-        mbps: mbps, bytes: totalBytes, samples: measurements.length);
+        megabytesPerSecond: megabytesPerSecond,
+        bytes: totalBytes,
+        samples: measurements.length);
   }
 
   Future<_TransferResult> _downloadRequest(
@@ -249,9 +268,11 @@ class _TransferResult {
 
 class _BatchResult {
   const _BatchResult(
-      {required this.mbps, required this.bytes, required this.samples});
+      {required this.megabytesPerSecond,
+      required this.bytes,
+      required this.samples});
 
-  final double mbps;
+  final double megabytesPerSecond;
   final int bytes;
   final int samples;
 }

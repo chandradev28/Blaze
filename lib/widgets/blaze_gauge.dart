@@ -15,6 +15,7 @@ class BlazeGauge extends StatefulWidget {
     this.upload,
     this.ping,
     this.jitter,
+    this.scaleMax,
     this.height,
     super.key,
   });
@@ -26,6 +27,7 @@ class BlazeGauge extends StatefulWidget {
   final double? upload;
   final double? ping;
   final double? jitter;
+  final double? scaleMax;
   final double? height;
 
   @override
@@ -96,6 +98,7 @@ class _BlazeGaugeState extends State<BlazeGauge> with TickerProviderStateMixin {
                 upload: widget.upload,
                 ping: widget.ping,
                 jitter: widget.jitter,
+                scaleMax: widget.scaleMax,
               ),
             ),
             if (svgAsset != null)
@@ -122,6 +125,7 @@ class GaugePainter extends CustomPainter {
     this.upload,
     this.ping,
     this.jitter,
+    this.scaleMax,
   }) : super(repaint: Listenable.merge([valueAnimation, effectAnimation]));
 
   final BlazeTheme theme;
@@ -132,23 +136,180 @@ class GaugePainter extends CustomPainter {
   final double? upload;
   final double? ping;
   final double? jitter;
+  final double? scaleMax;
 
   double get value => valueAnimation.value;
   double get effect => effectAnimation.value;
-  double get progress => (value / theme.maxSpeed).clamp(0.0, 1.0);
+  double get dialMax => math.max(scaleMax ?? theme.maxSpeed.toDouble(), 1);
+  double get progress => (value / dialMax).clamp(0.0, 1.0);
 
   @override
   void paint(Canvas canvas, Size size) {
     switch (theme.gaugeStyle) {
+      case GaugeStyle.classic:
+        _paintMotorcycle(canvas, size);
       case GaugeStyle.f1:
         _paintF1(canvas, size);
       case GaugeStyle.motoGp:
         _paintMotoGp(canvas, size);
-      case GaugeStyle.classic:
       case GaugeStyle.electric:
       case GaugeStyle.neon:
         _paintRadial(canvas, size);
     }
+  }
+
+  void _paintMotorcycle(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height * 0.50);
+    final radius = math.min(size.width, size.height) * 0.40;
+    final outerRadius = radius * 1.18;
+    final faceRadius = radius * 1.03;
+    const needleColor = Color(0xFFE5232C);
+    const startAngle = math.pi * 0.78;
+    const sweepAngle = math.pi * 1.44;
+
+    final bezel = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Color(0xFF6C7277),
+          Color(0xFFE7E9E8),
+          Color(0xFF565B60),
+          Color(0xFFBEC3C3),
+        ],
+        stops: [0, 0.34, 0.66, 1],
+      ).createShader(Rect.fromCircle(center: center, radius: outerRadius));
+    canvas.drawCircle(center, outerRadius, bezel);
+    canvas.drawCircle(
+        center, outerRadius * 0.93, Paint()..color = Colors.black);
+
+    final face = Paint()
+      ..shader = const RadialGradient(
+        colors: [Color(0xFFFFFFFF), Color(0xFFE4E5E2)],
+      ).createShader(Rect.fromCircle(center: center, radius: faceRadius));
+    canvas.drawCircle(center, faceRadius, face);
+    canvas.drawCircle(
+        center,
+        faceRadius * 0.96,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5
+          ..color = const Color(0xFF25282A));
+
+    if (theme.showGrid) {
+      final grid = Paint()
+        ..color = Colors.black.withOpacity(0.035)
+        ..strokeWidth = 1;
+      canvas.drawCircle(
+          center, faceRadius * 0.64, grid..style = PaintingStyle.stroke);
+    }
+
+    _drawMotorcycleTicks(canvas, center, radius, startAngle, sweepAngle);
+
+    final angle = startAngle + sweepAngle * progress;
+    final direction = Offset(math.cos(angle), math.sin(angle));
+    final tail = center - direction * radius * 0.16;
+    final tip = center + direction * radius * 0.80;
+    final needleShadow = Paint()
+      ..color = Colors.black.withOpacity(0.25)
+      ..strokeWidth = 8
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(tail.translate(2, 3), tip.translate(2, 3), needleShadow);
+    canvas.drawLine(
+        tail,
+        tip,
+        Paint()
+          ..color = needleColor
+          ..strokeWidth = 5
+          ..strokeCap = StrokeCap.round);
+    canvas.drawCircle(center, radius * 0.105, Paint()..color = Colors.black);
+    canvas.drawCircle(
+        center,
+        radius * 0.087,
+        Paint()
+          ..shader = const RadialGradient(
+            colors: [Color(0xFF464646), Color(0xFF090909)],
+          ).createShader(
+              Rect.fromCircle(center: center, radius: radius * 0.087)));
+
+    _drawText(canvas, 'MBps', center.translate(0, -radius * 0.18), 22,
+        const Color(0xFF161719), FontWeight.w900,
+        letterSpacing: 0.2);
+    _drawText(canvas, _phaseLabel, center.translate(0, -radius * 0.02), 8,
+        Colors.black.withOpacity(0.48), FontWeight.w800,
+        letterSpacing: 1.5);
+    _drawOdometer(canvas, center.translate(0, radius * 0.65), radius);
+
+    final glass = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..color = Colors.white.withOpacity(0.30);
+    canvas.drawArc(Rect.fromCircle(center: center, radius: faceRadius * 0.92),
+        math.pi * 1.05, math.pi * 0.78, false, glass);
+  }
+
+  void _drawMotorcycleTicks(Canvas canvas, Offset center, double radius,
+      double startAngle, double sweepAngle) {
+    final paint = Paint()..strokeCap = StrokeCap.square;
+    for (var index = 0; index <= 80; index++) {
+      final angle = startAngle + sweepAngle * index / 80;
+      final major = index % 10 == 0;
+      final medium = index % 5 == 0;
+      final inner = radius *
+          (major
+              ? 0.77
+              : medium
+                  ? 0.81
+                  : 0.84);
+      final outer = radius *
+          (major
+              ? 0.94
+              : medium
+                  ? 0.91
+                  : 0.89);
+      paint
+        ..strokeWidth = major
+            ? 3
+            : medium
+                ? 2
+                : 1
+        ..color = Colors.black.withOpacity(major
+            ? 0.90
+            : medium
+                ? 0.72
+                : 0.52);
+      canvas.drawLine(center + Offset(math.cos(angle), math.sin(angle)) * inner,
+          center + Offset(math.cos(angle), math.sin(angle)) * outer, paint);
+      if (major) {
+        final number = dialMax * index / 80;
+        _drawText(
+            canvas,
+            _formatDialNumber(number),
+            center + Offset(math.cos(angle), math.sin(angle)) * radius * 0.66,
+            dialMax >= 100 ? 13 : 15,
+            const Color(0xFF171819),
+            FontWeight.w900,
+            letterSpacing: 0);
+      }
+    }
+  }
+
+  void _drawOdometer(Canvas canvas, Offset center, double radius) {
+    final box = RRect.fromRectAndRadius(
+        Rect.fromCenter(
+            center: center, width: radius * 1.30, height: radius * 0.19),
+        const Radius.circular(2));
+    canvas.drawRRect(box, Paint()..color = const Color(0xFFB9BBBA));
+    canvas.drawRRect(
+        box,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1
+          ..color = const Color(0xFF56595A));
+    final digits = value.toStringAsFixed(value >= 100 ? 0 : 1).padLeft(6, '0');
+    _drawText(canvas, digits, center, radius * 0.16, const Color(0xFF27292A),
+        FontWeight.w700,
+        letterSpacing: 2.2, fontFamily: 'monospace');
   }
 
   void _paintF1(Canvas canvas, Size size) {
@@ -200,7 +361,7 @@ class GaugePainter extends CustomPainter {
     _drawText(canvas, _displayValue, screen.center.translate(0, -8), 38,
         Colors.white, FontWeight.w900,
         letterSpacing: -1.2);
-    _drawText(canvas, 'Mbps', screen.center.translate(0, 27), 10,
+    _drawText(canvas, 'MBps', screen.center.translate(0, 27), 10,
         theme.secondary, FontWeight.w800,
         letterSpacing: 1.6);
 
@@ -342,7 +503,7 @@ class GaugePainter extends CustomPainter {
     _drawText(canvas, _displayValue, center.translate(0, 4), 42, Colors.white,
         FontWeight.w900,
         letterSpacing: -1.4);
-    _drawText(canvas, 'Mbps', center.translate(0, 38), 10, theme.secondary,
+    _drawText(canvas, 'MBps', center.translate(0, 38), 10, theme.secondary,
         FontWeight.w800,
         letterSpacing: 1.7);
     _drawText(canvas, _phaseLabel, center.translate(0, 59), 9,
@@ -489,7 +650,7 @@ class GaugePainter extends CustomPainter {
     canvas.drawCircle(center, radius * 0.055, Paint()..color = theme.primary);
     _drawText(canvas, _displayValue, center.translate(0, radius * 0.03),
         radius * 0.24, Colors.white, FontWeight.w800);
-    _drawText(canvas, 'Mbps', center.translate(0, radius * 0.25), 12,
+    _drawText(canvas, 'MBps', center.translate(0, radius * 0.25), 12,
         theme.secondary, FontWeight.w700);
     _drawText(canvas, _phaseLabel, center.translate(0, radius * 0.41), 10,
         Colors.white.withOpacity(0.42), FontWeight.w700);
@@ -534,7 +695,7 @@ class GaugePainter extends CustomPainter {
       if (major && index < 40) {
         _drawText(
             canvas,
-            '${((theme.maxSpeed / 8) * (index / 5)).round()}',
+            _formatDialNumber(dialMax * index / 40),
             center + Offset(math.cos(angle), math.sin(angle)) * radius * 0.68,
             10,
             Colors.white.withOpacity(0.58),
@@ -566,15 +727,20 @@ class GaugePainter extends CustomPainter {
   }
 
   double _metricProgress(double? metric) =>
-      metric == null ? 0 : (metric / theme.maxSpeed).clamp(0.0, 1.0);
+      metric == null ? 0 : (metric / dialMax).clamp(0.0, 1.0);
 
   String _metricValue(double? metric) => metric == null
       ? '--'
-      : '${metric.toStringAsFixed(metric >= 100 ? 0 : 1)} Mbps';
+      : '${metric.toStringAsFixed(metric >= 100 ? 0 : 1)} MBps';
 
   String get _displayValue {
     if (value >= 100) return value.round().toString();
     return value.toStringAsFixed(1);
+  }
+
+  String _formatDialNumber(double number) {
+    if (dialMax < 10) return number.toStringAsFixed(1);
+    return number.round().toString();
   }
 
   String get _phaseLabel {
@@ -605,6 +771,7 @@ class GaugePainter extends CustomPainter {
     FontWeight weight, {
     double letterSpacing = 0.5,
     FontStyle fontStyle = FontStyle.normal,
+    String? fontFamily,
   }) {
     final painter = TextPainter(
       text: TextSpan(
@@ -614,7 +781,8 @@ class GaugePainter extends CustomPainter {
               fontSize: fontSize,
               fontWeight: weight,
               letterSpacing: letterSpacing,
-              fontStyle: fontStyle)),
+              fontStyle: fontStyle,
+              fontFamily: fontFamily)),
       textDirection: TextDirection.ltr,
     )..layout();
     painter.paint(
@@ -629,7 +797,8 @@ class GaugePainter extends CustomPainter {
         oldDelegate.download != download ||
         oldDelegate.upload != upload ||
         oldDelegate.ping != ping ||
-        oldDelegate.jitter != jitter;
+        oldDelegate.jitter != jitter ||
+        oldDelegate.scaleMax != scaleMax;
   }
 }
 
