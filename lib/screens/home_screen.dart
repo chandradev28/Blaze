@@ -2,22 +2,55 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../controllers/blaze_controller.dart';
+import '../models/blaze_theme.dart';
 import '../models/speed_result.dart';
 import '../services/speed_test_service.dart';
 import '../widgets/blaze_gauge.dart';
 import '../widgets/blaze_ui.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({required this.controller, super.key});
 
   final BlazeController controller;
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  late final PageController _profileController;
+  late int _profileIndex;
+
+  List<BlazeTheme> get _profiles => BlazeTheme.presets;
+
+  @override
+  void initState() {
+    super.initState();
+    final activeId = widget.controller.activeTheme.id;
+    final selected = _profiles.indexWhere((profile) => profile.id == activeId);
+    _profileIndex = selected < 0 ? 0 : selected;
+    _profileController = PageController(initialPage: _profileIndex);
+  }
+
+  @override
+  void dispose() {
+    _profileController.dispose();
+    super.dispose();
+  }
+
+  void _selectProfile(int index) {
+    if (index == _profileIndex) return;
+    setState(() => _profileIndex = index);
+    widget.controller.selectTheme(_profiles[index]);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: controller,
+      animation: widget.controller,
       builder: (context, _) {
-        final theme = controller.activeTheme;
+        final controller = widget.controller;
+        final theme = _profiles[_profileIndex];
         final result = controller.latestResult;
         final value = _gaugeValue(controller);
         return Container(
@@ -29,7 +62,7 @@ class HomeScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _Header(theme: theme),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 14),
                   Row(
                     children: [
                       _StatusPill(
@@ -43,23 +76,39 @@ class HomeScreen extends StatelessWidget {
                               fontWeight: FontWeight.w700)),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  BlazeGauge(
-                      theme: theme,
-                      value: value,
-                      phase: controller.phase,
-                      download: result?.download ??
-                          (controller.phase == TestPhase.download
-                              ? value
-                              : null),
-                      upload: result?.upload ??
-                          (controller.phase == TestPhase.upload ? value : null),
-                      ping: result?.ping,
-                      jitter: result?.jitter,
-                      scaleMax: controller.dialMax,
-                      height: 350),
                   const SizedBox(height: 4),
-                  _StartButton(controller: controller),
+                  SizedBox(
+                    height: 362,
+                    child: PageView.builder(
+                      controller: _profileController,
+                      itemCount: _profiles.length,
+                      onPageChanged: _selectProfile,
+                      physics: const BouncingScrollPhysics(),
+                      itemBuilder: (context, index) {
+                        final profile = _profiles[index];
+                        return BlazeGauge(
+                          theme: profile,
+                          value: value,
+                          phase: controller.phase,
+                          download: result?.download ??
+                              (controller.phase == TestPhase.download
+                                  ? value
+                                  : null),
+                          upload: result?.upload ??
+                              (controller.phase == TestPhase.upload
+                                  ? value
+                                  : null),
+                          ping: result?.ping,
+                          jitter: result?.jitter,
+                          scaleMax: controller.dialMax,
+                          height: 350,
+                        );
+                      },
+                    ),
+                  ),
+                  _SwipeHint(index: _profileIndex, count: _profiles.length),
+                  const SizedBox(height: 10),
+                  _StartButton(controller: controller, theme: theme),
                   const SizedBox(height: 12),
                   if (controller.errorMessage != null)
                     _ErrorCard(
@@ -71,37 +120,14 @@ class HomeScreen extends StatelessWidget {
                     _ResultCard(result: result, theme: theme),
                   ],
                   if (result == null && controller.phase == TestPhase.idle) ...[
-                    const SizedBox(height: 14),
-                    _IdleHint(theme: theme),
+                    const SizedBox(height: 12),
+                    Text('Swipe the dial to choose a profile',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            color: Colors.white.withOpacity(0.38),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700)),
                   ],
-                  const SizedBox(height: 22),
-                  BlazeCard(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
-                    child: Row(
-                      children: [
-                        Icon(Icons.tune_rounded, color: theme.primary),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Make it yours',
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.w800)),
-                              const SizedBox(height: 3),
-                              Text('Build a new dashboard in Blaze Garage',
-                                  style: TextStyle(
-                                      color: Colors.white.withOpacity(0.48),
-                                      fontSize: 12)),
-                            ],
-                          ),
-                        ),
-                        Icon(Icons.arrow_forward_ios_rounded,
-                            size: 15, color: theme.secondary),
-                      ],
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -125,6 +151,40 @@ class HomeScreen extends StatelessWidget {
       case TestPhase.idle:
         return 0;
     }
+  }
+}
+
+class _SwipeHint extends StatelessWidget {
+  const _SwipeHint({required this.index, required this.count});
+
+  final int index;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.chevron_left_rounded, size: 17, color: Colors.white38),
+        const SizedBox(width: 4),
+        ...List.generate(
+          count,
+          (dot) => AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            height: 5,
+            width: dot == index ? 18 : 5,
+            decoration: BoxDecoration(
+              color: dot == index ? const Color(0xFFFF3B30) : Colors.white24,
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+        const SizedBox(width: 4),
+        const Icon(Icons.chevron_right_rounded,
+            size: 17, color: Colors.white38),
+      ],
+    );
   }
 }
 
@@ -233,13 +293,13 @@ class _StatusPill extends StatelessWidget {
 }
 
 class _StartButton extends StatelessWidget {
-  const _StartButton({required this.controller});
+  const _StartButton({required this.controller, required this.theme});
 
   final BlazeController controller;
+  final BlazeTheme theme;
 
   @override
   Widget build(BuildContext context) {
-    final theme = controller.activeTheme;
     final label = controller.isTesting
         ? 'TESTING…'
         : controller.phase == TestPhase.finished
@@ -266,32 +326,6 @@ class _StartButton extends StatelessWidget {
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         ),
-      ),
-    );
-  }
-}
-
-class _IdleHint extends StatelessWidget {
-  const _IdleHint({required this.theme});
-
-  final dynamic theme;
-
-  @override
-  Widget build(BuildContext context) {
-    return BlazeCard(
-      child: Row(
-        children: [
-          Icon(Icons.info_outline_rounded, color: theme.secondary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-                'A full run samples about 22 MB across multiple requests. Wi-Fi recommended for your first run.',
-                style: TextStyle(
-                    color: Colors.white.withOpacity(0.56),
-                    fontSize: 12,
-                    height: 1.35)),
-          ),
-        ],
       ),
     );
   }

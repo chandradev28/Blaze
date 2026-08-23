@@ -163,7 +163,6 @@ class GaugePainter extends CustomPainter {
     final radius = math.min(size.width, size.height) * 0.40;
     final outerRadius = radius * 1.18;
     final faceRadius = radius * 1.03;
-    const needleColor = Color(0xFFE5232C);
     const startAngle = math.pi * 0.78;
     const sweepAngle = math.pi * 1.44;
 
@@ -219,7 +218,7 @@ class GaugePainter extends CustomPainter {
         tail,
         tip,
         Paint()
-          ..color = needleColor
+          ..color = theme.primary
           ..strokeWidth = 5
           ..strokeCap = StrokeCap.round);
     canvas.drawCircle(center, radius * 0.105, Paint()..color = Colors.black);

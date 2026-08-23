@@ -8,17 +8,14 @@ Blaze is an Android-first internet speed tester built with Flutter. Its defining
 - Pure-black stage with fixed dashboard palettes
 - Blaze home speedometer
 - Motorcycle-style physical dial with live decimal MBps readout
-- Blaze Garage customization flow
-- Six original dashboard presets
-- Dedicated F1 telemetry and MotoGP dashboard layouts
+- One minimal Ookla-style test page
+- Six swipeable profiles using the same reference motorcycle dial
 - SVG peak-detail overlays and continuous scan/pulse motion
-- Gauge style, speed scale, telemetry sweep, pulse, motion, grid, and glow controls
-- Saved custom dashboards using local storage
+- Horizontal hand-swipe profile selection on the main page
 - Multi-sample ping, concurrent download, and concurrent upload measurements
 - Instantaneous transfer-rate needle with a data-driven dial ceiling (no forced 1000 MBps sweep)
 - Incomplete-response validation and confidence/data-usage reporting
-- Local test history
-- Shareable result text
+- Inline results and shareable result text on the main page
 - Manual-only GitHub Actions build workflow
 
 ## Run locally
@@ -38,4 +35,4 @@ The workflow in `.github/workflows/android-build.yml` is intentionally configure
 
 ## Rendering approach
 
-The main dashboards are drawn with Flutter's `CustomPainter` instead of a fixed image. F1 uses a rectangular telemetry panel with shift LEDs, speed screen, DL/UL bars, and telemetry blocks. MotoGP uses a race-display cluster with arc indicators, gear/lean fields, and side data rails. Dashboard properties are modeled as data, so new styles can be added without rewriting the test screen.
+The reference motorcycle dial is drawn with Flutter's `CustomPainter` instead of a fixed image. Swipe profiles change the instrument treatment while keeping the same physical dial renderer, so the test screen stays focused and minimal.
