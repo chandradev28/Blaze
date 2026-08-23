@@ -14,7 +14,7 @@ class SpeedResult {
 
   final DateTime timestamp;
 
-  /// Decimal megabytes per second (MBps), not megabits per second.
+  /// Decimal megabits per second (Mbps), the standard consumer speed unit.
   final double download;
   final double upload;
   final double ping;
@@ -33,15 +33,15 @@ class SpeedResult {
   }
 
   String get quality {
-    if (download >= 25 && ping < 30) return 'Excellent';
-    if (download >= 6.25 && ping < 70) return 'Good';
-    if (download >= 1.25) return 'Stable';
+    if (download >= 200 && ping < 30) return 'Excellent';
+    if (download >= 50 && ping < 70) return 'Good';
+    if (download >= 10) return 'Stable';
     return 'Needs a boost';
   }
 
   Map<String, dynamic> toJson() => {
         'timestamp': timestamp.toIso8601String(),
-        'speedUnit': 'MBps',
+        'speedUnit': 'Mbps',
         'download': download,
         'upload': upload,
         'ping': ping,
@@ -54,10 +54,10 @@ class SpeedResult {
       };
 
   factory SpeedResult.fromJson(Map<String, dynamic> json) {
-    // Results saved by pre-MBps builds were stored as Mbps. Migrate them once
-    // so history does not suddenly report values eight times too high.
+    // The immediately preceding build stored MBps. Convert those values back
+    // to the standard Mbps unit. Older/unspecified results already used Mbps.
     final storedUnit = json['speedUnit'] as String?;
-    final conversion = storedUnit == 'MBps' ? 1.0 : 1 / 8;
+    final conversion = storedUnit == 'MBps' ? 8.0 : 1.0;
     return SpeedResult(
       timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ??
           DateTime.now(),

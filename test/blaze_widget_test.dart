@@ -17,8 +17,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 120));
 
     expect(find.text('BLAZE'), findsOneWidget);
-    expect(find.text('START TEST'), findsOneWidget);
-    expect(find.text('Reference Classic'), findsOneWidget);
+    expect(find.text('GO'), findsOneWidget);
+    expect(find.text('CLASSIC 140'), findsOneWidget);
     expect(find.byType(PageView), findsOneWidget);
     expect(find.text('Garage'), findsNothing);
     expect(find.text('History'), findsNothing);
@@ -36,7 +36,7 @@ void main() {
         isTrue);
   });
 
-  test('speed results are stored and migrated as decimal MBps', () {
+  test('speed results are stored and migrated as decimal Mbps', () {
     final legacy = SpeedResult.fromJson({
       'timestamp': DateTime.now().toIso8601String(),
       'download': 100,
@@ -49,16 +49,25 @@ void main() {
       'uploadSamples': 3,
       'bytesUsed': 100,
     });
-    expect(legacy.download, 12.5);
-    expect(legacy.upload, 5);
+    expect(legacy.download, 100);
+    expect(legacy.upload, 40);
 
     final current = SpeedResult.fromJson({
       'speedUnit': 'MBps',
       'download': 12.5,
       'upload': 5,
     });
-    expect(current.toJson()['speedUnit'], 'MBps');
-    expect(current.download, 12.5);
+    expect(current.toJson()['speedUnit'], 'Mbps');
+    expect(current.download, 100);
+    expect(current.upload, 40);
+
+    final mbps = SpeedResult.fromJson({
+      'speedUnit': 'Mbps',
+      'download': 26.6,
+      'upload': 20.68,
+    });
+    expect(mbps.download, 26.6);
+    expect(mbps.upload, 20.68);
   });
 
   testWidgets('the main page can render vector and photographic profiles',

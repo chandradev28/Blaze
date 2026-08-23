@@ -138,7 +138,7 @@ class _GarageScreenState extends State<GarageScreen> {
                         children: [
                           _SliderRow(
                             label: 'Preview scale',
-                            valueLabel: '${_draft.maxSpeed} MBps',
+                            valueLabel: '${_draft.maxSpeed} Mbps',
                             value: _draft.maxSpeed.toDouble(),
                             min: 10,
                             max: 1000,

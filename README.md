@@ -7,14 +7,14 @@ Blaze is an Android-first internet speed tester built with Flutter. Its defining
 - Android-only Flutter app
 - Pure-black stage with fixed dashboard palettes
 - Blaze home speedometer
-- Motorcycle-style physical dial with live decimal MBps readout
+- Motorcycle-style physical dial with live decimal Mbps readout
 - One minimal Ookla-style test page
 - Eight swipeable dial profiles: one code-native classic and seven photographic dashboards
 - Original dial faces with their fixed needles removed and live Flutter needles overlaid
 - SVG peak-detail overlays and continuous scan/pulse motion
 - Horizontal hand-swipe profile selection on the main page
-- Multi-sample ping, concurrent download, and concurrent upload measurements
-- Instantaneous transfer-rate needle with a data-driven dial ceiling (no forced 1000 MBps sweep)
+- Multi-sample ping and adaptive, continuously replenished multi-stream transfers
+- Instantaneous transfer-rate needle with a data-driven dial ceiling (no forced 1000 Mbps sweep)
 - Incomplete-response validation and confidence/data-usage reporting
 - Inline results and shareable result text on the main page
 - Manual-only GitHub Actions build workflow
@@ -28,7 +28,7 @@ flutter test
 flutter run
 ```
 
-The app currently uses Cloudflare's public speed-test endpoints. The measurement service ramps through multiple request sizes and concurrent streams, rejects incomplete responses instead of saving a number, and reports the amount of data sampled. It is isolated in `lib/services/speed_test_service.dart` so it can be replaced with Blaze-owned regional test servers later.
+The app currently uses Cloudflare's public speed-test endpoints. The measurement service performs an unscored warm-up probe, chooses two to eight parallel streams from the observed connection, continuously replenishes transfers for a timed test window, reports decimal Mbps, rejects incomplete responses instead of saving a number, and caps data use. It is isolated in `lib/services/speed_test_service.dart` so it can be replaced with Blaze-owned regional test servers later.
 
 ## GitHub Actions
 
@@ -36,6 +36,6 @@ The workflow in `.github/workflows/android-build.yml` is intentionally configure
 
 ## Rendering approach
 
-The reference motorcycle dial is drawn with Flutter's `CustomPainter`. The seven supplied dashboard photos are stored as cleaned, needle-free faces in `assets/dials/`; each has its own pivot, sweep, hub, needle treatment, and live MBps overlay. The photo and needle are transformed together so they remain aligned while the dial is cropped for the one-screen layout.
+The reference motorcycle dial is drawn with Flutter's `CustomPainter`. The seven supplied dashboard photos are stored as cleaned, needle-free faces in `assets/dials/`; each has its own pivot, sweep, hub, needle treatment, and live Mbps overlay. The photo and needle are transformed together so they remain aligned while the dial is cropped for the one-screen layout.
 
 The supplied dashboard imagery may contain vehicle branding or third-party photography. Confirm distribution rights before publishing those assets in an app store build.

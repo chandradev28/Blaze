@@ -1,16 +1,17 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import '../models/speed_result.dart';
 
 enum TestPhase { idle, connecting, ping, download, upload, finished, error }
 
 class SpeedTestProgress {
-  const SpeedTestProgress({required this.fraction, required this.speedMBps});
+  const SpeedTestProgress({required this.fraction, required this.speedMbps});
 
   final double fraction;
-  final double speedMBps;
+  final double speedMbps;
 }
 
 class SpeedTestException implements Exception {
@@ -24,29 +25,20 @@ class SpeedTestException implements Exception {
 
 class SpeedTestService {
   static final _base = Uri.parse('https://speed.cloudflare.com');
+  static final Uint8List _uploadBuffer = _makeUploadBuffer();
 
-  // This ramp-up follows the same principle as mature speed-test engines:
-  // measure several request sizes concurrently instead of trusting one file.
-  // Progress reports expose aggregate decimal megabytes per second while the
-  // final result uses the complete batch elapsed time.
-  static const _downloadPlan = [
-    2 * 1024 * 1024,
-    4 * 1024 * 1024,
-    8 * 1024 * 1024,
-  ];
-  static const _uploadPlan = [
-    1 * 1024 * 1024,
-    2 * 1024 * 1024,
-    4 * 1024 * 1024,
-  ];
+  static const _testDuration = Duration(seconds: 6);
+  static const _downloadLimit = 160 * 1024 * 1024;
+  static const _uploadLimit = 96 * 1024 * 1024;
 
   Future<SpeedResult> run({
     required void Function(TestPhase phase) onPhase,
     required void Function(SpeedTestProgress progress) onProgress,
   }) async {
     final client = HttpClient()
+      ..autoUncompress = false
       ..connectionTimeout = const Duration(seconds: 10)
-      ..idleTimeout = const Duration(seconds: 12)
+      ..idleTimeout = const Duration(seconds: 15)
       ..maxConnectionsPerHost = 8;
     try {
       onPhase(TestPhase.connecting);
@@ -58,26 +50,24 @@ class SpeedTestService {
       final jitter = _averageDelta(pingSamples);
 
       onPhase(TestPhase.download);
-      final downloadBatch = await _measureBatch(
+      final downloadBatch = await _measureAdaptive(
         client,
         direction: _Direction.download,
-        plan: _downloadPlan,
         onProgress: onProgress,
       );
 
       onPhase(TestPhase.upload);
-      final uploadBatch = await _measureBatch(
+      final uploadBatch = await _measureAdaptive(
         client,
         direction: _Direction.upload,
-        plan: _uploadPlan,
         onProgress: onProgress,
       );
 
       onPhase(TestPhase.finished);
       return SpeedResult(
         timestamp: DateTime.now(),
-        download: downloadBatch.megabytesPerSecond,
-        upload: uploadBatch.megabytesPerSecond,
+        download: downloadBatch.megabitsPerSecond,
+        upload: uploadBatch.megabitsPerSecond,
         ping: ping,
         jitter: jitter,
         server: metadata['colo']?.toString() ?? 'Cloudflare edge',
@@ -112,82 +102,138 @@ class SpeedTestService {
     void Function(SpeedTestProgress progress) onProgress,
   ) async {
     final samples = <double>[];
-    // Ignore the first request as a connection warm-up. Eight samples leave
-    // seven observations for the median/jitter calculation.
-    for (var index = 0; index < 8; index++) {
+    const requestCount = 12;
+    for (var index = 0; index < requestCount; index++) {
       final watch = Stopwatch()..start();
-      final request = await client.getUrl(_base.resolve(
-        '/__down?bytes=0&measId=${DateTime.now().microsecondsSinceEpoch}',
-      ));
+      final request = await client.getUrl(_measurementUri('/__down', 0));
       final response = await request.close();
-      await response.drain<void>();
       watch.stop();
+      await response.drain<void>();
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw const SpeedTestException(
-            'The test server rejected the latency check.');
+          'The test server rejected the latency check.',
+        );
       }
-      if (index > 0) samples.add(watch.elapsedMicroseconds / 1000);
-      onProgress(SpeedTestProgress(fraction: (index + 1) / 8, speedMBps: 0));
+      // Two requests warm DNS, TLS and the persistent connection. The median
+      // of the remaining samples is stable without cherry-picking one low ping.
+      if (index >= 2) samples.add(watch.elapsedMicroseconds / 1000);
+      onProgress(
+        SpeedTestProgress(
+          fraction: (index + 1) / requestCount,
+          speedMbps: 0,
+        ),
+      );
     }
     if (samples.length < 3) {
       throw const SpeedTestException(
-          'Not enough latency samples were returned.');
+        'Not enough latency samples were returned.',
+      );
     }
     return samples;
   }
 
-  Future<_BatchResult> _measureBatch(
+  Future<_BatchResult> _measureAdaptive(
     HttpClient client, {
     required _Direction direction,
-    required List<int> plan,
     required void Function(SpeedTestProgress progress) onProgress,
   }) async {
-    final expectedBytes = plan.fold<int>(0, (sum, bytes) => sum + bytes);
-    var completedBytes = 0;
-    final wallClock = Stopwatch()..start();
-
-    void reportProgress([int delta = 0]) {
-      completedBytes += delta;
-      final elapsedSeconds =
-          math.max(wallClock.elapsedMicroseconds / 1000000, 0.001);
-      onProgress(SpeedTestProgress(
-        fraction: (completedBytes / expectedBytes).clamp(0.0, 1.0),
-        speedMBps: completedBytes / elapsedSeconds / 1000000,
-      ));
-    }
-
-    final measurements = await Future.wait(
-      plan.map((bytes) async {
-        final measurement = direction == _Direction.download
-            ? await _downloadRequest(client, bytes, reportProgress)
-            : await _uploadRequest(client, bytes, reportProgress);
-        return measurement;
-      }),
+    // A short unscored probe warms the path and sizes the real transfer. This
+    // avoids a tiny request on fast links and excessive data on slow links.
+    final probeBytes =
+        direction == _Direction.download ? 1024 * 1024 : 384 * 1024;
+    final probe = direction == _Direction.download
+        ? await _downloadRequest(client, probeBytes, (_) {})
+        : await _uploadRequest(client, probeBytes, (_) {});
+    final estimateMbps = _toMbps(probe.bytes, probe.elapsed);
+    final streams = _streamCount(estimateMbps);
+    final requestBytes = _requestSize(
+      estimateMbps,
+      streams,
+      direction: direction,
     );
-    wallClock.stop();
+    final byteLimit =
+        direction == _Direction.download ? _downloadLimit : _uploadLimit;
 
-    final totalBytes =
-        measurements.fold<int>(0, (sum, item) => sum + item.bytes);
-    if (totalBytes < expectedBytes * 0.9) {
-      throw SpeedTestException(
-        '${direction.name.capitalize()} test returned incomplete data. No result was saved.',
+    var transferredBytes = 0;
+    var completedRequests = 0;
+    var lastReportBytes = 0;
+    var lastReportMicros = 0;
+    var smoothedMbps = 0.0;
+    final watch = Stopwatch()..start();
+
+    void reportBytes(int delta) {
+      transferredBytes += delta;
+      final elapsedMicros = math.max(watch.elapsedMicroseconds, 1);
+      final intervalMicros = elapsedMicros - lastReportMicros;
+      if (intervalMicros < 80 * 1000 && transferredBytes < byteLimit) return;
+
+      final intervalBytes = transferredBytes - lastReportBytes;
+      final instantMbps = intervalBytes * 8 * 1000000 / intervalMicros / 1e6;
+      smoothedMbps = smoothedMbps == 0
+          ? instantMbps
+          : smoothedMbps * 0.62 + instantMbps * 0.38;
+      lastReportBytes = transferredBytes;
+      lastReportMicros = elapsedMicros;
+      onProgress(
+        SpeedTestProgress(
+          fraction: (watch.elapsedMicroseconds / _testDuration.inMicroseconds)
+              .clamp(0.0, 0.99),
+          speedMbps: smoothedMbps,
+        ),
       );
     }
-    if (wallClock.elapsedMilliseconds < 8) {
-      throw const SpeedTestException(
-          'The test completed too quickly to produce a reliable result.');
+
+    Future<void> worker() async {
+      while (watch.elapsed < _testDuration && transferredBytes < byteLimit) {
+        if (direction == _Direction.download) {
+          await _downloadRequest(client, requestBytes, reportBytes);
+        } else {
+          await _uploadRequest(client, requestBytes, reportBytes);
+        }
+        completedRequests++;
+      }
     }
 
-    final seconds = math.max(wallClock.elapsedMicroseconds / 1000000, 0.001);
-    final megabytesPerSecond = totalBytes / seconds / 1000000;
-    onProgress(SpeedTestProgress(
-      fraction: 1,
-      speedMBps: megabytesPerSecond,
-    ));
+    await Future.wait(List.generate(streams, (_) => worker()));
+    watch.stop();
+
+    if (transferredBytes < 128 * 1024 || completedRequests == 0) {
+      throw SpeedTestException(
+        '${direction.name.capitalize()} test returned too little data. No result was saved.',
+      );
+    }
+    if (watch.elapsedMilliseconds < 100) {
+      throw const SpeedTestException(
+        'The test completed too quickly to produce a reliable result.',
+      );
+    }
+
+    final finalMbps = _toMbps(transferredBytes, watch.elapsed);
+    onProgress(SpeedTestProgress(fraction: 1, speedMbps: finalMbps));
     return _BatchResult(
-        megabytesPerSecond: megabytesPerSecond,
-        bytes: totalBytes,
-        samples: measurements.length);
+      megabitsPerSecond: finalMbps,
+      bytes: transferredBytes + probe.bytes,
+      samples: completedRequests + 1,
+    );
+  }
+
+  int _streamCount(double estimateMbps) {
+    if (estimateMbps < 5) return 2;
+    if (estimateMbps < 80) return 4;
+    if (estimateMbps < 300) return 6;
+    return 8;
+  }
+
+  int _requestSize(
+    double estimateMbps,
+    int streams, {
+    required _Direction direction,
+  }) {
+    final bytesPerSecond = estimateMbps * 1000000 / 8;
+    final target = (bytesPerSecond * 0.9 / streams).round();
+    final maximum =
+        direction == _Direction.download ? 8 * 1024 * 1024 : 4 * 1024 * 1024;
+    return target.clamp(256 * 1024, maximum);
   }
 
   Future<_TransferResult> _downloadRequest(
@@ -195,10 +241,9 @@ class SpeedTestService {
     int bytes,
     void Function(int delta) onBytes,
   ) async {
-    final request = await client.getUrl(_base.resolve(
-      '/__down?bytes=$bytes&measId=${DateTime.now().microsecondsSinceEpoch}',
-    ));
-    request.headers.add(HttpHeaders.cacheControlHeader, 'no-cache');
+    final watch = Stopwatch()..start();
+    final request = await client.getUrl(_measurementUri('/__down', bytes));
+    request.headers.add(HttpHeaders.cacheControlHeader, 'no-store');
     final response = await request.close();
     if (response.statusCode < 200 || response.statusCode >= 300) {
       await response.drain<void>();
@@ -209,11 +254,13 @@ class SpeedTestService {
       received += chunk.length;
       onBytes(chunk.length);
     }
+    watch.stop();
     if (received < bytes * 0.9) {
       throw const SpeedTestException(
-          'The download stream ended early. No result was saved.');
+        'The download stream ended early. No result was saved.',
+      );
     }
-    return _TransferResult(bytes: received);
+    return _TransferResult(bytes: received, elapsed: watch.elapsed);
   }
 
   Future<_TransferResult> _uploadRequest(
@@ -221,22 +268,53 @@ class SpeedTestService {
     int bytes,
     void Function(int delta) onBytes,
   ) async {
-    final payload = List<int>.filled(bytes, 66);
-    final request = await client.postUrl(_base.resolve(
-      '/__up?measId=${DateTime.now().microsecondsSinceEpoch}',
-    ));
-    request.headers
-      ..contentType = ContentType.binary
-      ..contentLength = payload.length
-      ..add(HttpHeaders.cacheControlHeader, 'no-cache');
-    request.add(payload);
+    final watch = Stopwatch()..start();
+    final request = await client.postUrl(_measurementUri('/__up', bytes));
+    request
+      ..bufferOutput = false
+      ..headers.contentType = ContentType.binary
+      ..contentLength = bytes;
+    request.headers.add(HttpHeaders.cacheControlHeader, 'no-store');
+
+    var sent = 0;
+    var unreported = 0;
+    while (sent < bytes) {
+      final count = math.min(_uploadBuffer.length, bytes - sent);
+      request.add(
+        count == _uploadBuffer.length
+            ? _uploadBuffer
+            : Uint8List.sublistView(_uploadBuffer, 0, count),
+      );
+      sent += count;
+      unreported += count;
+      if (unreported >= 512 * 1024 || sent == bytes) {
+        await request.flush();
+        onBytes(unreported);
+        unreported = 0;
+      }
+    }
+
     final response = await request.close();
     await response.drain<void>();
+    watch.stop();
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw const SpeedTestException('The upload server returned an error.');
     }
-    onBytes(payload.length);
-    return _TransferResult(bytes: payload.length);
+    return _TransferResult(bytes: sent, elapsed: watch.elapsed);
+  }
+
+  Uri _measurementUri(String path, int bytes) {
+    return _base.resolve(path).replace(
+      queryParameters: {
+        'bytes': '$bytes',
+        'measId': '${DateTime.now().microsecondsSinceEpoch}',
+      },
+    );
+  }
+
+  double _toMbps(int bytes, Duration elapsed) {
+    final seconds = math.max(elapsed.inMicroseconds / 1000000, 0.001);
+    return bytes * 8 / seconds / 1000000;
   }
 
   double _percentile(List<double> values, double percentile) {
@@ -258,21 +336,35 @@ class SpeedTestService {
   }
 }
 
+Uint8List _makeUploadBuffer() {
+  final bytes = Uint8List(64 * 1024);
+  var state = 0x5A17C9E3;
+  for (var index = 0; index < bytes.length; index++) {
+    state = (state ^ (state << 13)) & 0xFFFFFFFF;
+    state = (state ^ (state >> 17)) & 0xFFFFFFFF;
+    state = (state ^ (state << 5)) & 0xFFFFFFFF;
+    bytes[index] = state & 0xFF;
+  }
+  return bytes;
+}
+
 enum _Direction { download, upload }
 
 class _TransferResult {
-  const _TransferResult({required this.bytes});
+  const _TransferResult({required this.bytes, required this.elapsed});
 
   final int bytes;
+  final Duration elapsed;
 }
 
 class _BatchResult {
-  const _BatchResult(
-      {required this.megabytesPerSecond,
-      required this.bytes,
-      required this.samples});
+  const _BatchResult({
+    required this.megabitsPerSecond,
+    required this.bytes,
+    required this.samples,
+  });
 
-  final double megabytesPerSecond;
+  final double megabitsPerSecond;
   final int bytes;
   final int samples;
 }

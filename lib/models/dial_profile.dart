@@ -57,13 +57,13 @@ class DialProfile {
   static const presets = <DialProfile>[
     DialProfile(
       themeId: 'blaze-core',
-      name: 'Reference Classic',
-      subtitle: 'Mechanical white face',
+      name: 'Classic 140',
+      subtitle: 'Mechanical white',
     ),
     DialProfile(
       themeId: 'aventador-blue',
-      name: 'Aventador',
-      subtitle: 'V12 blue instrument',
+      name: 'V12 370',
+      subtitle: 'Blue supercar',
       assetPath: 'assets/dials/lamborghini-clean.png',
       needles: [
         DialNeedleSpec(
@@ -80,8 +80,8 @@ class DialProfile {
     ),
     DialProfile(
       themeId: 'ferrari-center',
-      name: 'Ferrari Center',
-      subtitle: 'Central race tachometer',
+      name: 'Rosso Center',
+      subtitle: 'Central race dial',
       assetPath: 'assets/dials/ferrari-dashboard-clean.png',
       needles: [
         DialNeedleSpec(
@@ -98,8 +98,8 @@ class DialProfile {
     ),
     DialProfile(
       themeId: 'bmw-touring',
-      name: 'M Touring',
-      subtitle: 'Classic dual-scale dial',
+      name: 'M Classic',
+      subtitle: 'Dual-scale touring',
       assetPath: 'assets/dials/bmw-classic-clean.png',
       imageScale: 1.12,
       imageAlignment: Alignment(0, 0.28),
@@ -118,7 +118,7 @@ class DialProfile {
     ),
     DialProfile(
       themeId: 'ferrari-tach',
-      name: 'Ferrari Tach',
+      name: 'Rosso Tach',
       subtitle: 'High-RPM sweep',
       assetPath: 'assets/dials/ferrari-tach-clean.png',
       imageScale: 1.04,
@@ -137,8 +137,8 @@ class DialProfile {
     ),
     DialProfile(
       themeId: 'classic-redline',
-      name: 'Redline Classic',
-      subtitle: 'Orange analog dial',
+      name: 'Heritage 140',
+      subtitle: 'Orange analog',
       assetPath: 'assets/dials/classic-red-clean.png',
       needles: [
         DialNeedleSpec(
@@ -155,8 +155,8 @@ class DialProfile {
     ),
     DialProfile(
       themeId: 'digital-dual',
-      name: 'Digital Dual',
-      subtitle: 'Twin live needles',
+      name: 'Twin Digital',
+      subtitle: 'Dual live needles',
       assetPath: 'assets/dials/digital-dual-clean.png',
       needles: [
         DialNeedleSpec(
@@ -184,8 +184,8 @@ class DialProfile {
     ),
     DialProfile(
       themeId: 'neon-pulse',
-      name: 'Neon Pulse',
-      subtitle: 'Purple electric dial',
+      name: 'Neon 240',
+      subtitle: 'Electric violet',
       assetPath: 'assets/dials/neon-clean.png',
       needles: [
         DialNeedleSpec(

@@ -128,9 +128,9 @@ class BlazeController extends ChangeNotifier {
         },
         onProgress: (progress) {
           gaugeValue = progress.fraction;
-          if (progress.speedMBps > 0) {
-            liveSpeed = progress.speedMBps;
-            peakSpeed = math.max(peakSpeed, progress.speedMBps);
+          if (progress.speedMbps > 0) {
+            liveSpeed = progress.speedMbps;
+            peakSpeed = math.max(peakSpeed, progress.speedMbps);
           }
           final now = DateTime.now();
           if (progress.fraction < 1 &&

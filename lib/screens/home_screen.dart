@@ -72,12 +72,36 @@ class _HomeScreenState extends State<HomeScreen> {
                           phase: controller.phase,
                           isTesting: controller.isTesting),
                       const Spacer(),
-                      Text(selectedProfile.name,
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 240),
+                        transitionBuilder: (child, animation) => FadeTransition(
+                          opacity: animation,
+                          child: SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0.08, 0),
+                              end: Offset.zero,
+                            ).animate(animation),
+                            child: child,
+                          ),
+                        ),
+                        child: Text(
+                          selectedProfile.name.toUpperCase(),
+                          key: ValueKey(selectedProfile.themeId),
                           style: TextStyle(
-                              color: theme.secondary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700)),
+                            color: Colors.white.withOpacity(0.58),
+                            fontSize: 10,
+                            letterSpacing: 1.6,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
                     ],
+                  ),
+                  const SizedBox(height: 9),
+                  _PhaseTrack(
+                    progress: controller.gaugeValue,
+                    isTesting: controller.isTesting,
+                    color: theme.primary,
                   ),
                   const SizedBox(height: 4),
                   SizedBox(
@@ -104,14 +128,20 @@ class _HomeScreenState extends State<HomeScreen> {
                                   : null),
                           ping: result?.ping,
                           jitter: result?.jitter,
-                          scaleMax: controller.dialMax,
+                          scaleMax: profile.usesPhoto
+                              ? profile.theme.maxSpeed.toDouble()
+                              : controller.dialMax,
                           height: 350,
                         );
                       },
                     ),
                   ),
-                  _SwipeHint(index: _profileIndex, count: _profiles.length),
-                  const SizedBox(height: 10),
+                  _SwipeHint(
+                    index: _profileIndex,
+                    count: _profiles.length,
+                    color: theme.primary,
+                  ),
+                  const SizedBox(height: 14),
                   _StartButton(controller: controller, theme: theme),
                   const SizedBox(height: 12),
                   if (controller.errorMessage != null)
@@ -159,35 +189,66 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _SwipeHint extends StatelessWidget {
-  const _SwipeHint({required this.index, required this.count});
+  const _SwipeHint({
+    required this.index,
+    required this.count,
+    required this.color,
+  });
 
   final int index;
   final int count;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(Icons.chevron_left_rounded, size: 17, color: Colors.white38),
-        const SizedBox(width: 4),
         ...List.generate(
           count,
           (dot) => AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            margin: const EdgeInsets.symmetric(horizontal: 3),
-            height: 5,
-            width: dot == index ? 18 : 5,
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            height: 4,
+            width: dot == index ? 18 : 4,
             decoration: BoxDecoration(
-              color: dot == index ? const Color(0xFFFF3B30) : Colors.white24,
+              color: dot == index ? color : Colors.white24,
               borderRadius: BorderRadius.circular(8),
+              boxShadow: dot == index
+                  ? [BoxShadow(color: color.withOpacity(0.38), blurRadius: 9)]
+                  : null,
             ),
           ),
         ),
-        const SizedBox(width: 4),
-        const Icon(Icons.chevron_right_rounded,
-            size: 17, color: Colors.white38),
       ],
+    );
+  }
+}
+
+class _PhaseTrack extends StatelessWidget {
+  const _PhaseTrack({
+    required this.progress,
+    required this.isTesting,
+    required this.color,
+  });
+
+  final double progress;
+  final bool isTesting;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        height: 2,
+        child: LinearProgressIndicator(
+          value: isTesting ? progress.clamp(0.0, 1.0) : 0,
+          backgroundColor: Colors.white.withOpacity(0.05),
+          valueColor: AlwaysStoppedAnimation(color),
+        ),
+      ),
     );
   }
 }
@@ -201,41 +262,73 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          height: 42,
-          width: 42,
-          decoration: BoxDecoration(
-            color: theme.primary.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: theme.primary.withOpacity(0.30)),
+        SizedBox(
+          height: 38,
+          width: 30,
+          child: CustomPaint(
+            painter: _BlazeMarkPainter(color: theme.primary),
           ),
-          child: Icon(Icons.local_fire_department_rounded,
-              color: theme.primary, size: 24),
         ),
-        const SizedBox(width: 12),
-        const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('BLAZE',
-                style: TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 3)),
-            Text('NETWORK PERFORMANCE',
-                style: TextStyle(
-                    fontSize: 9,
-                    letterSpacing: 1.5,
-                    color: Colors.white54,
-                    fontWeight: FontWeight.w700)),
-          ],
+        const SizedBox(width: 9),
+        const Text(
+          'BLAZE',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 4.2,
+          ),
         ),
         const Spacer(),
-        const IconButton(
-            onPressed: null,
-            icon: Icon(Icons.more_horiz_rounded, color: Colors.white54)),
+        Text(
+          'SPEED  /  Mbps',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.32),
+            fontSize: 9,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.2,
+          ),
+        ),
       ],
     );
   }
+}
+
+class _BlazeMarkPainter extends CustomPainter {
+  const _BlazeMarkPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(size.width * 0.66, 0)
+      ..lineTo(size.width * 0.17, size.height * 0.56)
+      ..lineTo(size.width * 0.47, size.height * 0.53)
+      ..lineTo(size.width * 0.25, size.height)
+      ..lineTo(size.width * 0.86, size.height * 0.37)
+      ..lineTo(size.width * 0.55, size.height * 0.40)
+      ..close();
+    canvas.drawPath(
+      path,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.white, color, const Color(0xFFFF3B30)],
+        ).createShader(Offset.zero & size),
+    );
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = Colors.white.withOpacity(0.45),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _BlazeMarkPainter oldDelegate) =>
+      oldDelegate.color != color;
 }
 
 class _StatusPill extends StatelessWidget {
@@ -251,28 +344,35 @@ class _StatusPill extends StatelessWidget {
         : phase == TestPhase.error
             ? const Color(0xFFFF5A5F)
             : const Color(0xFF8BFF74);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(99),
-          border: Border.all(color: color.withOpacity(0.24))),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-              height: 6,
-              width: 6,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-          const SizedBox(width: 7),
-          Text(_label,
-              style: TextStyle(
-                  color: color,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1)),
-        ],
-      ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.45, end: isTesting ? 1 : 0.65),
+          duration: const Duration(milliseconds: 700),
+          builder: (context, opacity, _) => Container(
+            height: 7,
+            width: 7,
+            decoration: BoxDecoration(
+              color: color.withOpacity(opacity),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(color: color.withOpacity(0.46), blurRadius: 8),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          _label,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.54),
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.4,
+          ),
+        ),
+      ],
     );
   }
 
@@ -304,31 +404,71 @@ class _StartButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = controller.isTesting
-        ? 'TESTING…'
-        : controller.phase == TestPhase.finished
-            ? 'TEST AGAIN'
-            : 'START TEST';
-    return SizedBox(
-      width: double.infinity,
-      height: 58,
-      child: FilledButton.icon(
-        onPressed: controller.isTesting ? null : controller.startTest,
-        icon: Icon(
-            controller.isTesting
-                ? Icons.graphic_eq_rounded
-                : Icons.play_arrow_rounded,
-            size: 22),
-        label: Text(label,
-            style: const TextStyle(
-                fontWeight: FontWeight.w900, letterSpacing: 1.3)),
-        style: FilledButton.styleFrom(
-          backgroundColor: theme.primary,
-          foregroundColor: Colors.black,
-          disabledBackgroundColor: theme.primary.withOpacity(0.42),
-          disabledForegroundColor: Colors.black54,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+    final canStart = !controller.isTesting;
+    final finished = controller.phase == TestPhase.finished;
+    return Center(
+      child: Semantics(
+        button: true,
+        label: finished ? 'Test again' : 'Start speed test',
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: canStart ? controller.startTest : null,
+            customBorder: const CircleBorder(),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+              height: 78,
+              width: 78,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF0B0B0D),
+                border: Border.all(
+                  color: theme.primary.withOpacity(canStart ? 0.82 : 0.28),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.primary.withOpacity(
+                      controller.isTesting ? 0.10 : 0.28,
+                    ),
+                    blurRadius: controller.isTesting ? 12 : 25,
+                    spreadRadius: controller.isTesting ? 0 : 2,
+                  ),
+                ],
+              ),
+              child: controller.isTesting
+                  ? Padding(
+                      padding: const EdgeInsets.all(23),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: theme.primary,
+                        backgroundColor: Colors.white.withOpacity(0.08),
+                      ),
+                    )
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          finished
+                              ? Icons.refresh_rounded
+                              : Icons.play_arrow_rounded,
+                          color: Colors.white,
+                          size: 25,
+                        ),
+                        Text(
+                          finished ? 'AGAIN' : 'GO',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.62),
+                            fontSize: 8,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
         ),
       ),
     );
@@ -367,62 +507,79 @@ class _ResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final shareText =
-        'Blaze result — ${result.download.toStringAsFixed(1)} MBps down, ${result.upload.toStringAsFixed(1)} MBps up, ${result.ping.toStringAsFixed(0)} ms ping. ${result.quality} connection.';
-    return BlazeCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('RESULT',
-                    style: TextStyle(
-                        color: theme.secondary,
-                        fontSize: 10,
-                        letterSpacing: 1.5,
-                        fontWeight: FontWeight.w900)),
-                const SizedBox(height: 4),
-                Text(result.quality,
-                    style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.w900)),
-              ]),
-              const Spacer(),
-              IconButton(
-                tooltip: 'Share result',
-                onPressed: () =>
-                    Share.share(shareText, subject: 'My Blaze speed test'),
-                icon: Icon(Icons.ios_share_rounded, color: theme.primary),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Row(children: [
-            MetricTile(
-                label: 'Download',
-                value: result.download.toStringAsFixed(1),
-                unit: 'MBps'),
-            MetricTile(
-                label: 'Upload',
-                value: result.upload.toStringAsFixed(1),
-                unit: 'MBps'),
-            MetricTile(
-                label: 'Ping',
-                value: result.ping.toStringAsFixed(0),
-                unit: 'ms'),
-          ]),
-          const SizedBox(height: 16),
-          Text(
-              '${_confidenceLabel(result)}  •  ${_megabytes(result.bytesUsed)} MB sampled',
-              style: TextStyle(
-                  color: theme.secondary,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.8)),
-          const SizedBox(height: 7),
-          Text('${result.provider}  •  ${result.server}',
-              style: TextStyle(
-                  color: Colors.white.withOpacity(0.38), fontSize: 11)),
-        ],
+        'Blaze result — ${result.download.toStringAsFixed(1)} Mbps down, ${result.upload.toStringAsFixed(1)} Mbps up, ${result.ping.toStringAsFixed(0)} ms ping. ${result.quality} connection.';
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 480),
+      curve: Curves.easeOutCubic,
+      builder: (context, progress, child) => Opacity(
+        opacity: progress,
+        child: Transform.translate(
+          offset: Offset(0, 18 * (1 - progress)),
+          child: child,
+        ),
+      ),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(18, 17, 18, 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF09090B),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('RESULT',
+                      style: TextStyle(
+                          color: theme.secondary,
+                          fontSize: 10,
+                          letterSpacing: 1.5,
+                          fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 4),
+                  Text(result.quality,
+                      style: const TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.w900)),
+                ]),
+                const Spacer(),
+                IconButton(
+                  tooltip: 'Share result',
+                  onPressed: () =>
+                      Share.share(shareText, subject: 'My Blaze speed test'),
+                  icon: Icon(Icons.ios_share_rounded, color: theme.primary),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Row(children: [
+              MetricTile(
+                  label: 'Download',
+                  value: result.download.toStringAsFixed(1),
+                  unit: 'Mbps'),
+              MetricTile(
+                  label: 'Upload',
+                  value: result.upload.toStringAsFixed(1),
+                  unit: 'Mbps'),
+              MetricTile(
+                  label: 'Ping',
+                  value: result.ping.toStringAsFixed(0),
+                  unit: 'ms'),
+            ]),
+            const SizedBox(height: 16),
+            Text(
+                '${_confidenceLabel(result)}  •  ${_megabytes(result.bytesUsed)} MB sampled',
+                style: TextStyle(
+                    color: theme.secondary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8)),
+            const SizedBox(height: 7),
+            Text('${result.provider}  •  ${result.server}',
+                style: TextStyle(
+                    color: Colors.white.withOpacity(0.38), fontSize: 11)),
+          ],
+        ),
       ),
     );
   }

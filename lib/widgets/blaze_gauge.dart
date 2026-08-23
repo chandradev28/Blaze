@@ -47,7 +47,7 @@ class _BlazeGaugeState extends State<BlazeGauge> with TickerProviderStateMixin {
     super.initState();
     _valueController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 520),
+      duration: const Duration(milliseconds: 220),
     );
     _effectController = AnimationController(
       vsync: this,
@@ -151,12 +151,24 @@ class _BlazeGaugeState extends State<BlazeGauge> with TickerProviderStateMixin {
                           filterQuality: FilterQuality.high,
                         ),
                         CustomPaint(
+                          painter: PhotoAtmospherePainter(
+                            profile: profile,
+                            theme: widget.theme,
+                            valueAnimation: _valueAnimation,
+                            effectAnimation: _effectController,
+                            scaleMax: dialMax,
+                            phase: widget.phase,
+                          ),
+                        ),
+                        CustomPaint(
                           isComplex: true,
                           willChange: true,
                           painter: PhotoNeedlePainter(
                             profile: profile,
                             valueAnimation: _valueAnimation,
+                            effectAnimation: _effectController,
                             scaleMax: dialMax,
+                            phase: widget.phase,
                           ),
                         ),
                       ],
@@ -175,25 +187,39 @@ class _BlazeGaugeState extends State<BlazeGauge> with TickerProviderStateMixin {
                             vertical: 7,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.82),
+                            color: Colors.black.withOpacity(0.78),
                             borderRadius: BorderRadius.circular(99),
-                            border: Border.all(
-                              color: widget.theme.primary.withOpacity(0.56),
-                            ),
                             boxShadow: [
                               BoxShadow(
-                                color: widget.theme.primary.withOpacity(0.18),
-                                blurRadius: 12,
+                                color: widget.theme.primary.withOpacity(0.24),
+                                blurRadius: 18,
                               ),
                             ],
                           ),
-                          child: Text(
-                            '${_formatLiveValue(_valueAnimation.value)} MBps',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.4,
+                          child: Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: _formatLiveValue(
+                                    _valueAnimation.value,
+                                  ),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -0.4,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: '  Mbps',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.56),
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -219,12 +245,16 @@ class PhotoNeedlePainter extends CustomPainter {
   PhotoNeedlePainter({
     required this.profile,
     required this.valueAnimation,
+    required this.effectAnimation,
     required this.scaleMax,
-  }) : super(repaint: valueAnimation);
+    required this.phase,
+  }) : super(repaint: Listenable.merge([valueAnimation, effectAnimation]));
 
   final DialProfile profile;
   final Animation<double> valueAnimation;
+  final Animation<double> effectAnimation;
   final double scaleMax;
+  final TestPhase phase;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -259,6 +289,22 @@ class PhotoNeedlePainter extends CustomPainter {
           pivot.dy - normal.dy * halfWidth,
         )
         ..close();
+      if (_isActive) {
+        for (var trail = 3; trail >= 1; trail--) {
+          final trailAngle = angle - trail * 0.012;
+          final trailTip = pivot +
+              Offset(math.cos(trailAngle), math.sin(trailAngle)) * length;
+          canvas.drawLine(
+            pivot,
+            trailTip,
+            Paint()
+              ..color = needle.color.withOpacity(0.05 * (4 - trail))
+              ..strokeWidth = needle.width + trail * 2
+              ..strokeCap = StrokeCap.round
+              ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+          );
+        }
+      }
       canvas.save();
       canvas.translate(2, 3);
       canvas.drawPath(
@@ -297,12 +343,101 @@ class PhotoNeedlePainter extends CustomPainter {
         hubRadius * 0.20,
         Paint()..color = Colors.white.withOpacity(0.48),
       );
+      if (_isActive) {
+        final pulse =
+            0.55 + math.sin(effectAnimation.value * math.pi * 2) * 0.2;
+        canvas.drawCircle(
+          tip,
+          3.5,
+          Paint()
+            ..color = needle.color.withOpacity(pulse)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+        );
+      }
     }
   }
+
+  bool get _isActive =>
+      phase == TestPhase.download || phase == TestPhase.upload;
 
   @override
   bool shouldRepaint(covariant PhotoNeedlePainter oldDelegate) {
     return oldDelegate.profile != profile || oldDelegate.scaleMax != scaleMax;
+  }
+}
+
+class PhotoAtmospherePainter extends CustomPainter {
+  PhotoAtmospherePainter({
+    required this.profile,
+    required this.theme,
+    required this.valueAnimation,
+    required this.effectAnimation,
+    required this.scaleMax,
+    required this.phase,
+  }) : super(repaint: Listenable.merge([valueAnimation, effectAnimation]));
+
+  final DialProfile profile;
+  final BlazeTheme theme;
+  final Animation<double> valueAnimation;
+  final Animation<double> effectAnimation;
+  final double scaleMax;
+  final TestPhase phase;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (profile.needles.isEmpty) return;
+    final active = phase == TestPhase.download || phase == TestPhase.upload;
+    final needle = profile.needles.first;
+    final progress =
+        (valueAnimation.value / math.max(scaleMax, 1)).clamp(0.0, 1.0);
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width, size.height) * 0.47;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+
+    canvas.drawArc(
+      rect,
+      needle.startAngle,
+      needle.sweepAngle,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = Colors.white.withOpacity(0.055),
+    );
+    canvas.drawArc(
+      rect,
+      needle.startAngle,
+      needle.sweepAngle * progress,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = 3
+        ..color = theme.primary.withOpacity(active ? 0.72 : 0.34)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+    );
+
+    if (active) {
+      final sweepAngle =
+          needle.startAngle + needle.sweepAngle * effectAnimation.value;
+      final point =
+          center + Offset(math.cos(sweepAngle), math.sin(sweepAngle)) * radius;
+      canvas.drawCircle(
+        point,
+        5,
+        Paint()
+          ..color = theme.secondary.withOpacity(0.68)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant PhotoAtmospherePainter oldDelegate) {
+    return oldDelegate.profile != profile ||
+        oldDelegate.theme != theme ||
+        oldDelegate.scaleMax != scaleMax ||
+        oldDelegate.phase != phase;
   }
 }
 
@@ -422,7 +557,7 @@ class GaugePainter extends CustomPainter {
           ).createShader(
               Rect.fromCircle(center: center, radius: radius * 0.087)));
 
-    _drawText(canvas, 'MBps', center.translate(0, -radius * 0.18), 22,
+    _drawText(canvas, 'Mbps', center.translate(0, -radius * 0.18), 22,
         const Color(0xFF161719), FontWeight.w900,
         letterSpacing: 0.2);
     _drawText(canvas, _phaseLabel, center.translate(0, -radius * 0.02), 8,
@@ -551,7 +686,7 @@ class GaugePainter extends CustomPainter {
     _drawText(canvas, _displayValue, screen.center.translate(0, -8), 38,
         Colors.white, FontWeight.w900,
         letterSpacing: -1.2);
-    _drawText(canvas, 'MBps', screen.center.translate(0, 27), 10,
+    _drawText(canvas, 'Mbps', screen.center.translate(0, 27), 10,
         theme.secondary, FontWeight.w800,
         letterSpacing: 1.6);
 
@@ -693,7 +828,7 @@ class GaugePainter extends CustomPainter {
     _drawText(canvas, _displayValue, center.translate(0, 4), 42, Colors.white,
         FontWeight.w900,
         letterSpacing: -1.4);
-    _drawText(canvas, 'MBps', center.translate(0, 38), 10, theme.secondary,
+    _drawText(canvas, 'Mbps', center.translate(0, 38), 10, theme.secondary,
         FontWeight.w800,
         letterSpacing: 1.7);
     _drawText(canvas, _phaseLabel, center.translate(0, 59), 9,
@@ -840,7 +975,7 @@ class GaugePainter extends CustomPainter {
     canvas.drawCircle(center, radius * 0.055, Paint()..color = theme.primary);
     _drawText(canvas, _displayValue, center.translate(0, radius * 0.03),
         radius * 0.24, Colors.white, FontWeight.w800);
-    _drawText(canvas, 'MBps', center.translate(0, radius * 0.25), 12,
+    _drawText(canvas, 'Mbps', center.translate(0, radius * 0.25), 12,
         theme.secondary, FontWeight.w700);
     _drawText(canvas, _phaseLabel, center.translate(0, radius * 0.41), 10,
         Colors.white.withOpacity(0.42), FontWeight.w700);
@@ -921,7 +1056,7 @@ class GaugePainter extends CustomPainter {
 
   String _metricValue(double? metric) => metric == null
       ? '--'
-      : '${metric.toStringAsFixed(metric >= 100 ? 0 : 1)} MBps';
+      : '${metric.toStringAsFixed(metric >= 100 ? 0 : 1)} Mbps';
 
   String get _displayValue {
     if (value >= 100) return value.round().toString();
