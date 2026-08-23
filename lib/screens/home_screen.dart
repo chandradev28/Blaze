@@ -3,6 +3,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../controllers/blaze_controller.dart';
 import '../models/blaze_theme.dart';
+import '../models/dial_profile.dart';
 import '../models/speed_result.dart';
 import '../services/speed_test_service.dart';
 import '../widgets/blaze_gauge.dart';
@@ -21,13 +22,14 @@ class _HomeScreenState extends State<HomeScreen> {
   late final PageController _profileController;
   late int _profileIndex;
 
-  List<BlazeTheme> get _profiles => BlazeTheme.presets;
+  List<DialProfile> get _profiles => DialProfile.presets;
 
   @override
   void initState() {
     super.initState();
     final activeId = widget.controller.activeTheme.id;
-    final selected = _profiles.indexWhere((profile) => profile.id == activeId);
+    final selected =
+        _profiles.indexWhere((profile) => profile.themeId == activeId);
     _profileIndex = selected < 0 ? 0 : selected;
     _profileController = PageController(initialPage: _profileIndex);
   }
@@ -41,7 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _selectProfile(int index) {
     if (index == _profileIndex) return;
     setState(() => _profileIndex = index);
-    widget.controller.selectTheme(_profiles[index]);
+    widget.controller.selectTheme(_profiles[index].theme);
   }
 
   @override
@@ -50,7 +52,8 @@ class _HomeScreenState extends State<HomeScreen> {
       animation: widget.controller,
       builder: (context, _) {
         final controller = widget.controller;
-        final theme = _profiles[_profileIndex];
+        final selectedProfile = _profiles[_profileIndex];
+        final theme = selectedProfile.theme;
         final result = controller.latestResult;
         final value = _gaugeValue(controller);
         return Container(
@@ -69,7 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           phase: controller.phase,
                           isTesting: controller.isTesting),
                       const Spacer(),
-                      Text(theme.name,
+                      Text(selectedProfile.name,
                           style: TextStyle(
                               color: theme.secondary,
                               fontSize: 12,
@@ -87,7 +90,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       itemBuilder: (context, index) {
                         final profile = _profiles[index];
                         return BlazeGauge(
-                          theme: profile,
+                          theme: profile.theme,
+                          profile: profile,
                           value: value,
                           phase: controller.phase,
                           download: result?.download ??

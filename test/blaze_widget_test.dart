@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:blaze/app.dart';
 import 'package:blaze/controllers/blaze_controller.dart';
 import 'package:blaze/models/blaze_theme.dart';
+import 'package:blaze/models/dial_profile.dart';
 import 'package:blaze/models/speed_result.dart';
 import 'package:blaze/services/speed_test_service.dart';
 import 'package:blaze/widgets/blaze_gauge.dart';
@@ -17,14 +18,16 @@ void main() {
 
     expect(find.text('BLAZE'), findsOneWidget);
     expect(find.text('START TEST'), findsOneWidget);
-    expect(find.text('Blaze Core'), findsOneWidget);
+    expect(find.text('Reference Classic'), findsOneWidget);
     expect(find.byType(PageView), findsOneWidget);
     expect(find.text('Garage'), findsNothing);
     expect(find.text('History'), findsNothing);
   });
 
-  test('swipe profiles all use the reference motorcycle dial', () {
-    expect(BlazeTheme.presets.length, greaterThanOrEqualTo(4));
+  test('swipe carousel has one vector and seven photographic dials', () {
+    expect(DialProfile.presets.length, 8);
+    expect(DialProfile.presets.where((profile) => profile.usesPhoto).length, 7);
+    expect(DialProfile.presets.first.usesPhoto, isFalse);
     expect(BlazeTheme.presets.map((theme) => theme.id).toSet().length,
         BlazeTheme.presets.length);
     expect(
@@ -58,7 +61,7 @@ void main() {
     expect(current.download, 12.5);
   });
 
-  testWidgets('the main page can render a swipeable reference profile',
+  testWidgets('the main page can render vector and photographic profiles',
       (tester) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -67,7 +70,8 @@ void main() {
             SizedBox(
               height: 280,
               child: BlazeGauge(
-                theme: BlazeTheme.presets[0],
+                theme: DialProfile.presets[0].theme,
+                profile: DialProfile.presets[0],
                 value: 12,
                 phase: TestPhase.download,
               ),
@@ -75,7 +79,8 @@ void main() {
             SizedBox(
               height: 280,
               child: BlazeGauge(
-                theme: BlazeTheme.presets[1],
+                theme: DialProfile.presets[1].theme,
+                profile: DialProfile.presets[1],
                 value: 12,
                 phase: TestPhase.upload,
               ),

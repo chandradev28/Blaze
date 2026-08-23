@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../models/blaze_theme.dart';
+import '../models/dial_profile.dart';
 import '../services/speed_test_service.dart';
 
 class BlazeGauge extends StatefulWidget {
@@ -11,6 +12,7 @@ class BlazeGauge extends StatefulWidget {
     required this.theme,
     required this.value,
     required this.phase,
+    this.profile,
     this.download,
     this.upload,
     this.ping,
@@ -21,6 +23,7 @@ class BlazeGauge extends StatefulWidget {
   });
 
   final BlazeTheme theme;
+  final DialProfile? profile;
   final double value;
   final TestPhase phase;
   final double? download;
@@ -74,6 +77,11 @@ class _BlazeGaugeState extends State<BlazeGauge> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    final profile = widget.profile;
+    if (profile?.usesPhoto ?? false) {
+      return _buildPhotoGauge(profile!);
+    }
+
     final svgAsset = switch (widget.theme.gaugeStyle) {
       GaugeStyle.f1 => 'assets/svg/f1_peak_details.svg',
       GaugeStyle.motoGp => 'assets/svg/motogp_peak_details.svg',
@@ -112,6 +120,189 @@ class _BlazeGaugeState extends State<BlazeGauge> with TickerProviderStateMixin {
         ),
       ),
     );
+  }
+
+  Widget _buildPhotoGauge(DialProfile profile) {
+    final dialMax = math.max(
+      widget.scaleMax ?? widget.theme.maxSpeed.toDouble(),
+      1.0,
+    );
+    return RepaintBoundary(
+      child: SizedBox(
+        height: widget.height,
+        width: double.infinity,
+        child: Center(
+          child: AspectRatio(
+            aspectRatio: 1,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Transform.scale(
+                    scale: profile.imageScale,
+                    alignment: profile.imageAlignment,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.asset(
+                          profile.assetPath!,
+                          fit: BoxFit.cover,
+                          filterQuality: FilterQuality.high,
+                        ),
+                        CustomPaint(
+                          isComplex: true,
+                          willChange: true,
+                          painter: PhotoNeedlePainter(
+                            profile: profile,
+                            valueAnimation: _valueAnimation,
+                            scaleMax: dialMax,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 8,
+                    child: Center(
+                      child: AnimatedBuilder(
+                        animation: _valueAnimation,
+                        builder: (context, _) => Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 13,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.82),
+                            borderRadius: BorderRadius.circular(99),
+                            border: Border.all(
+                              color: widget.theme.primary.withOpacity(0.56),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: widget.theme.primary.withOpacity(0.18),
+                                blurRadius: 12,
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            '${_formatLiveValue(_valueAnimation.value)} MBps',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatLiveValue(double value) {
+    if (value >= 100) return value.toStringAsFixed(0);
+    return value.toStringAsFixed(1);
+  }
+}
+
+class PhotoNeedlePainter extends CustomPainter {
+  PhotoNeedlePainter({
+    required this.profile,
+    required this.valueAnimation,
+    required this.scaleMax,
+  }) : super(repaint: valueAnimation);
+
+  final DialProfile profile;
+  final Animation<double> valueAnimation;
+  final double scaleMax;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final baseProgress =
+        (valueAnimation.value / math.max(scaleMax, 1)).clamp(0.0, 1.0);
+    final shortestSide = math.min(size.width, size.height);
+
+    for (final needle in profile.needles) {
+      final progress = (baseProgress * needle.speedMultiplier).clamp(0.0, 1.0);
+      final angle = needle.startAngle + needle.sweepAngle * progress;
+      final pivot = Offset(
+        size.width * needle.pivot.dx,
+        size.height * needle.pivot.dy,
+      );
+      final direction = Offset(math.cos(angle), math.sin(angle));
+      final normal = Offset(-direction.dy, direction.dx);
+      final length = shortestSide * needle.length;
+      final tailLength = length * 0.12;
+      final halfWidth = needle.width * 0.58;
+      final tip = pivot + direction * length;
+      final tail = pivot - direction * tailLength;
+
+      final needlePath = Path()
+        ..moveTo(tail.dx, tail.dy)
+        ..lineTo(
+          pivot.dx + normal.dx * halfWidth,
+          pivot.dy + normal.dy * halfWidth,
+        )
+        ..lineTo(tip.dx, tip.dy)
+        ..lineTo(
+          pivot.dx - normal.dx * halfWidth,
+          pivot.dy - normal.dy * halfWidth,
+        )
+        ..close();
+      canvas.save();
+      canvas.translate(2, 3);
+      canvas.drawPath(
+        needlePath,
+        Paint()
+          ..color = Colors.black.withOpacity(0.58)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
+      );
+      canvas.restore();
+      canvas.drawPath(needlePath, Paint()..color = needle.color);
+      canvas.drawLine(
+        pivot,
+        tip,
+        Paint()
+          ..color = Colors.white.withOpacity(0.32)
+          ..strokeWidth = math.max(needle.width * 0.22, 1)
+          ..strokeCap = StrokeCap.round,
+      );
+
+      final hubRadius = shortestSide * needle.hubRadius;
+      canvas.drawCircle(
+        pivot,
+        hubRadius * 1.12,
+        Paint()..color = Colors.black.withOpacity(0.72),
+      );
+      canvas.drawCircle(
+        pivot,
+        hubRadius,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [needle.hubColor.withOpacity(0.96), needle.hubColor],
+          ).createShader(Rect.fromCircle(center: pivot, radius: hubRadius)),
+      );
+      canvas.drawCircle(
+        pivot.translate(-hubRadius * 0.22, -hubRadius * 0.24),
+        hubRadius * 0.20,
+        Paint()..color = Colors.white.withOpacity(0.48),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant PhotoNeedlePainter oldDelegate) {
+    return oldDelegate.profile != profile || oldDelegate.scaleMax != scaleMax;
   }
 }
 
