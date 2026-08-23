@@ -13,45 +13,39 @@ class BlazeApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const orange = Color(0xFFFF6A3D);
-    const ink = Color(0xFF08090D);
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, _) {
-        final active = controller.activeTheme;
-        return MaterialApp(
-          debugShowCheckedModeBanner: false,
-          title: 'Blaze',
-          theme: ThemeData(
-            brightness: Brightness.dark,
-            useMaterial3: true,
-            scaffoldBackgroundColor: active.background,
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: orange,
-              brightness: Brightness.dark,
-              surface: ink,
-            ),
-            splashFactory: InkSparkle.splashFactory,
-            sliderTheme: SliderThemeData(
-              activeTrackColor: active.primary,
-              thumbColor: Colors.white,
-              inactiveTrackColor: Colors.white.withOpacity(0.12),
-              overlayColor: active.primary.withOpacity(0.16),
-            ),
-            navigationBarTheme: NavigationBarThemeData(
-              backgroundColor: ink.withOpacity(0.94),
-              indicatorColor: active.primary.withOpacity(0.20),
-              labelTextStyle: WidgetStatePropertyAll(
-                TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white.withOpacity(0.86),
-                ),
-              ),
+    const ink = Colors.black;
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Blaze',
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        useMaterial3: true,
+        scaffoldBackgroundColor: ink,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: orange,
+          brightness: Brightness.dark,
+          surface: ink,
+        ),
+        splashFactory: InkSparkle.splashFactory,
+        sliderTheme: SliderThemeData(
+          activeTrackColor: orange,
+          thumbColor: Colors.white,
+          inactiveTrackColor: Colors.white.withOpacity(0.12),
+          overlayColor: orange.withOpacity(0.16),
+        ),
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: Colors.black,
+          indicatorColor: orange.withOpacity(0.20),
+          labelTextStyle: WidgetStatePropertyAll(
+            TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Colors.white.withOpacity(0.86),
             ),
           ),
-          home: _BlazeShell(controller: controller),
-        );
-      },
+        ),
+      ),
+      home: _BlazeShell(controller: controller),
     );
   }
 }

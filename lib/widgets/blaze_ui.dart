@@ -120,7 +120,7 @@ class ThemePreview extends StatelessWidget {
         width: 154,
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: theme.background,
+          color: Colors.black,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
               color: selected ? theme.primary : Colors.white.withOpacity(0.08),

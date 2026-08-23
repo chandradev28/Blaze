@@ -24,6 +24,7 @@ class BlazeController extends ChangeNotifier {
   TestPhase phase = TestPhase.idle;
   double gaugeValue = 0;
   String? errorMessage;
+  DateTime? _lastProgressNotify;
 
   bool get isTesting =>
       phase != TestPhase.idle &&
@@ -96,6 +97,7 @@ class BlazeController extends ChangeNotifier {
     if (isTesting) return;
     errorMessage = null;
     gaugeValue = 0;
+    _lastProgressNotify = null;
     latestResult = null;
     phase = TestPhase.connecting;
     notifyListeners();
@@ -108,6 +110,13 @@ class BlazeController extends ChangeNotifier {
         },
         onProgress: (progress) {
           gaugeValue = progress;
+          final now = DateTime.now();
+          if (progress < 1 &&
+              _lastProgressNotify != null &&
+              now.difference(_lastProgressNotify!).inMilliseconds < 42) {
+            return;
+          }
+          _lastProgressNotify = now;
           notifyListeners();
         },
       );

@@ -11,7 +11,8 @@ void main() {
   testWidgets('renders the Blaze test dashboard', (tester) async {
     final controller = BlazeController();
     await tester.pumpWidget(BlazeApp(controller: controller));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
 
     expect(find.text('BLAZE'), findsOneWidget);
     expect(find.text('START TEST'), findsOneWidget);
@@ -50,7 +51,8 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
     expect(find.byType(BlazeGauge), findsNWidgets(2));
   });
 }

@@ -33,6 +33,8 @@ class BlazeTheme {
     required this.motion,
     required this.showGrid,
     required this.showGlow,
+    required this.showSweep,
+    required this.showPulse,
   });
 
   final String id;
@@ -47,6 +49,8 @@ class BlazeTheme {
   final double motion;
   final bool showGrid;
   final bool showGlow;
+  final bool showSweep;
+  final bool showPulse;
 
   BlazeTheme copyWith({
     String? id,
@@ -61,6 +65,8 @@ class BlazeTheme {
     double? motion,
     bool? showGrid,
     bool? showGlow,
+    bool? showSweep,
+    bool? showPulse,
   }) {
     return BlazeTheme(
       id: id ?? this.id,
@@ -75,6 +81,8 @@ class BlazeTheme {
       motion: motion ?? this.motion,
       showGrid: showGrid ?? this.showGrid,
       showGlow: showGlow ?? this.showGlow,
+      showSweep: showSweep ?? this.showSweep,
+      showPulse: showPulse ?? this.showPulse,
     );
   }
 
@@ -91,6 +99,8 @@ class BlazeTheme {
         'motion': motion,
         'showGrid': showGrid,
         'showGlow': showGlow,
+        'showSweep': showSweep,
+        'showPulse': showPulse,
       };
 
   factory BlazeTheme.fromJson(Map<String, dynamic> json) {
@@ -105,13 +115,15 @@ class BlazeTheme {
       subtitle: json['subtitle'] as String? ?? 'Custom build',
       primary: Color((json['primary'] as num?)?.toInt() ?? 0xFFFF6A3D),
       secondary: Color((json['secondary'] as num?)?.toInt() ?? 0xFFFFC857),
-      background: Color((json['background'] as num?)?.toInt() ?? 0xFF08090D),
+      background: Color((json['background'] as num?)?.toInt() ?? 0xFF000000),
       surface: Color((json['surface'] as num?)?.toInt() ?? 0xFF12141B),
       gaugeStyle: style,
       maxSpeed: (json['maxSpeed'] as num?)?.toInt() ?? 1000,
       motion: (json['motion'] as num?)?.toDouble() ?? 0.75,
       showGrid: json['showGrid'] as bool? ?? true,
       showGlow: json['showGlow'] as bool? ?? true,
+      showSweep: json['showSweep'] as bool? ?? true,
+      showPulse: json['showPulse'] as bool? ?? true,
     );
   }
 
@@ -122,13 +134,15 @@ class BlazeTheme {
       subtitle: 'The signature dashboard',
       primary: Color(0xFFFF6A3D),
       secondary: Color(0xFFFFC857),
-      background: Color(0xFF08090D),
+      background: Color(0xFF000000),
       surface: Color(0xFF12141B),
       gaugeStyle: GaugeStyle.classic,
       maxSpeed: 1000,
       motion: 0.80,
       showGrid: true,
       showGlow: true,
+      showSweep: true,
+      showPulse: true,
     ),
     BlazeTheme(
       id: 'grand-prix',
@@ -136,13 +150,15 @@ class BlazeTheme {
       subtitle: 'Telemetry for the fast lane',
       primary: Color(0xFFFF3B30),
       secondary: Color(0xFFFFD166),
-      background: Color(0xFF120A0D),
+      background: Color(0xFF000000),
       surface: Color(0xFF211114),
       gaugeStyle: GaugeStyle.f1,
       maxSpeed: 2000,
       motion: 0.92,
       showGrid: true,
       showGlow: true,
+      showSweep: true,
+      showPulse: true,
     ),
     BlazeTheme(
       id: 'moto-circuit',
@@ -150,13 +166,15 @@ class BlazeTheme {
       subtitle: 'Lean into the next test',
       primary: Color(0xFF42D6FF),
       secondary: Color(0xFFB3F4FF),
-      background: Color(0xFF061116),
+      background: Color(0xFF000000),
       surface: Color(0xFF0B2028),
       gaugeStyle: GaugeStyle.motoGp,
       maxSpeed: 800,
       motion: 0.88,
       showGrid: false,
       showGlow: true,
+      showSweep: true,
+      showPulse: true,
     ),
     BlazeTheme(
       id: 'electric-pulse',
@@ -164,13 +182,15 @@ class BlazeTheme {
       subtitle: 'Silent power, instant torque',
       primary: Color(0xFF8BFF74),
       secondary: Color(0xFFD6FFB8),
-      background: Color(0xFF07100A),
+      background: Color(0xFF000000),
       surface: Color(0xFF0E1D12),
       gaugeStyle: GaugeStyle.electric,
       maxSpeed: 5000,
       motion: 0.66,
       showGrid: true,
       showGlow: true,
+      showSweep: true,
+      showPulse: true,
     ),
     BlazeTheme(
       id: 'rally-storm',
@@ -178,13 +198,15 @@ class BlazeTheme {
       subtitle: 'Grip, grit, and great Wi-Fi',
       primary: Color(0xFFFF9F1C),
       secondary: Color(0xFFFFE29A),
-      background: Color(0xFF15100A),
+      background: Color(0xFF000000),
       surface: Color(0xFF241A0B),
       gaugeStyle: GaugeStyle.classic,
       maxSpeed: 1000,
       motion: 1.0,
       showGrid: true,
       showGlow: false,
+      showSweep: true,
+      showPulse: true,
     ),
     BlazeTheme(
       id: 'neon-street',
@@ -192,13 +214,15 @@ class BlazeTheme {
       subtitle: 'Midnight speed, bright signal',
       primary: Color(0xFFFF4ECD),
       secondary: Color(0xFF7C5CFF),
-      background: Color(0xFF100817),
+      background: Color(0xFF000000),
       surface: Color(0xFF1D1029),
       gaugeStyle: GaugeStyle.neon,
       maxSpeed: 1200,
       motion: 0.78,
       showGrid: true,
       showGlow: true,
+      showSweep: true,
+      showPulse: true,
     ),
   ];
 }

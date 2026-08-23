@@ -1,11 +1,12 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../models/blaze_theme.dart';
 import '../services/speed_test_service.dart';
 
-class BlazeGauge extends StatelessWidget {
+class BlazeGauge extends StatefulWidget {
   const BlazeGauge({
     required this.theme,
     required this.value,
@@ -28,21 +29,83 @@ class BlazeGauge extends StatelessWidget {
   final double? height;
 
   @override
+  State<BlazeGauge> createState() => _BlazeGaugeState();
+}
+
+class _BlazeGaugeState extends State<BlazeGauge> with TickerProviderStateMixin {
+  late final AnimationController _valueController;
+  late final AnimationController _effectController;
+  late Animation<double> _valueAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _valueController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 520),
+    );
+    _effectController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+    _valueAnimation = AlwaysStoppedAnimation(widget.value);
+  }
+
+  @override
+  void didUpdateWidget(covariant BlazeGauge oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value) {
+      final begin = _valueAnimation.value;
+      _valueAnimation = Tween<double>(begin: begin, end: widget.value).animate(
+        CurvedAnimation(parent: _valueController, curve: Curves.easeOutCubic),
+      );
+      _valueController.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _valueController.dispose();
+    _effectController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final svgAsset = switch (widget.theme.gaugeStyle) {
+      GaugeStyle.f1 => 'assets/svg/f1_peak_details.svg',
+      GaugeStyle.motoGp => 'assets/svg/motogp_peak_details.svg',
+      _ => null,
+    };
     return RepaintBoundary(
       child: SizedBox(
-        height: height,
+        height: widget.height,
         width: double.infinity,
-        child: CustomPaint(
-          painter: GaugePainter(
-            theme: theme,
-            value: value,
-            phase: phase,
-            download: download,
-            upload: upload,
-            ping: ping,
-            jitter: jitter,
-          ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            CustomPaint(
+              isComplex: true,
+              willChange: true,
+              painter: GaugePainter(
+                theme: widget.theme,
+                valueAnimation: _valueAnimation,
+                effectAnimation: _effectController,
+                phase: widget.phase,
+                download: widget.download,
+                upload: widget.upload,
+                ping: widget.ping,
+                jitter: widget.jitter,
+              ),
+            ),
+            if (svgAsset != null)
+              IgnorePointer(
+                child: Opacity(
+                  opacity: 0.60,
+                  child: SvgPicture.asset(svgAsset, fit: BoxFit.contain),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -52,22 +115,26 @@ class BlazeGauge extends StatelessWidget {
 class GaugePainter extends CustomPainter {
   GaugePainter({
     required this.theme,
-    required this.value,
+    required this.valueAnimation,
+    required this.effectAnimation,
     required this.phase,
     this.download,
     this.upload,
     this.ping,
     this.jitter,
-  });
+  }) : super(repaint: Listenable.merge([valueAnimation, effectAnimation]));
 
   final BlazeTheme theme;
-  final double value;
+  final Animation<double> valueAnimation;
+  final Animation<double> effectAnimation;
   final TestPhase phase;
   final double? download;
   final double? upload;
   final double? ping;
   final double? jitter;
 
+  double get value => valueAnimation.value;
+  double get effect => effectAnimation.value;
   double get progress => (value / theme.maxSpeed).clamp(0.0, 1.0);
 
   @override
@@ -119,6 +186,7 @@ class GaugePainter extends CustomPainter {
         FontWeight.w900,
         letterSpacing: 1.5);
     _drawShiftLights(canvas, center, panelRect.top + 42);
+    _drawF1Sweep(canvas, center, panelRect);
 
     final screen = RRect.fromRectAndRadius(
       Rect.fromCenter(
@@ -185,8 +253,33 @@ class GaugePainter extends CustomPainter {
           Rect.fromLTWH(start + index * (width + gap), y, width, 6),
           const Radius.circular(3));
       canvas.drawRRect(
-          rect, Paint()..color = isActive ? color : color.withOpacity(0.11));
+          rect,
+          Paint()
+            ..color = isActive
+                ? color.withOpacity(theme.showPulse
+                    ? 0.80 +
+                        math.sin(effect * math.pi * 2 + index) *
+                            0.16 *
+                            theme.motion
+                    : 1)
+                : color.withOpacity(0.11));
     }
+  }
+
+  void _drawF1Sweep(Canvas canvas, Offset center, Rect panel) {
+    if (!theme.showSweep) return;
+    final x = panel.left + 24 + (panel.width - 48) * effect;
+    final sweep = Paint()
+      ..shader = LinearGradient(
+        colors: [
+          Colors.transparent,
+          theme.primary.withOpacity(0.38),
+          Colors.transparent
+        ],
+      ).createShader(Rect.fromLTWH(x - 26, panel.top, 52, panel.height))
+      ..strokeWidth = 1;
+    canvas.drawLine(
+        Offset(x, panel.top + 36), Offset(x, panel.bottom - 46), sweep);
   }
 
   void _paintMotoGp(Canvas canvas, Size size) {
@@ -230,6 +323,7 @@ class GaugePainter extends CustomPainter {
       ..color = theme.primary;
     canvas.drawArc(
         arcRect, math.pi * 0.78, math.pi * 1.44 * progress, false, arcProgress);
+    _drawMotoSweep(canvas, arcRect);
 
     for (var index = 0; index < 18; index++) {
       final angle = math.pi * 0.78 + math.pi * 1.44 * index / 17;
@@ -288,6 +382,17 @@ class GaugePainter extends CustomPainter {
         FontWeight.w900);
   }
 
+  void _drawMotoSweep(Canvas canvas, Rect arcRect) {
+    if (!theme.showSweep) return;
+    final sweepAngle = math.pi * 0.78 + math.pi * 1.44 * effect;
+    final sweep = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4
+      ..strokeCap = StrokeCap.round
+      ..color = theme.secondary.withOpacity(0.46 + theme.motion * 0.30);
+    canvas.drawArc(arcRect, sweepAngle, 0.12, false, sweep);
+  }
+
   void _drawVerticalMetric(
       Canvas canvas, Offset origin, String label, double amount, Color color,
       {bool right = false}) {
@@ -315,6 +420,17 @@ class GaugePainter extends CustomPainter {
     const sweepAngle = math.pi * 1.44;
     canvas.drawCircle(center, radius * 1.12,
         Paint()..color = theme.surface.withOpacity(0.96));
+    if (theme.showPulse) {
+      final pulseRadius = radius *
+          (1.03 + math.sin(effect * math.pi * 2) * 0.02 * theme.motion);
+      canvas.drawCircle(
+          center,
+          pulseRadius,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2
+            ..color = theme.primary.withOpacity(0.12));
+    }
     if (theme.showGlow) {
       canvas.drawCircle(
           center,
@@ -346,6 +462,15 @@ class GaugePainter extends CustomPainter {
                 colors: [theme.primary, theme.secondary, theme.primary])
             .createShader(rect);
       canvas.drawArc(rect, startAngle, sweepAngle * progress, false, active);
+    }
+    if (theme.showSweep) {
+      final sweep = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4
+        ..strokeCap = StrokeCap.round
+        ..color = theme.secondary.withOpacity(0.46 + theme.motion * 0.30);
+      canvas.drawArc(
+          rect, startAngle + sweepAngle * effect, 0.11, false, sweep);
     }
     _drawTicks(canvas, center, radius, startAngle, sweepAngle);
     final angle = startAngle + sweepAngle * progress;

@@ -21,13 +21,7 @@ class HomeScreen extends StatelessWidget {
         final result = controller.latestResult;
         final value = _gaugeValue(theme.maxSpeed, controller);
         return Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [theme.background, theme.background.withOpacity(0.82)],
-            ),
-          ),
+          color: Colors.black,
           child: SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),

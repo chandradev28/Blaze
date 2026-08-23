@@ -17,7 +17,7 @@ class HistoryScreen extends StatelessWidget {
       builder: (context, _) {
         final theme = controller.activeTheme;
         return Container(
-          color: theme.background,
+          color: Colors.black,
           child: SafeArea(
             child: CustomScrollView(
               slivers: [

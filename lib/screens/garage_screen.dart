@@ -36,7 +36,7 @@ class _GarageScreenState extends State<GarageScreen> {
       builder: (context, _) {
         final theme = widget.controller.activeTheme;
         return Container(
-          color: theme.background,
+          color: Colors.black,
           child: SafeArea(
             child: CustomScrollView(
               slivers: [
@@ -129,16 +129,6 @@ class _GarageScreenState extends State<GarageScreen> {
                     ),
                   ),
                 ),
-                const SliverPadding(
-                  padding: EdgeInsets.fromLTRB(20, 24, 20, 0),
-                  sliver: SliverToBoxAdapter(
-                      child: BlazeSectionTitle(title: 'Accent color')),
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  sliver: SliverToBoxAdapter(
-                      child: _ColorSelector(draft: _draft, onChanged: _update)),
-                ),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
                   sliver: SliverToBoxAdapter(
@@ -193,6 +183,34 @@ class _GarageScreenState extends State<GarageScreen> {
                             activeColor: _draft.primary,
                             onChanged: (value) =>
                                 _update(_draft.copyWith(showGlow: value)),
+                          ),
+                          SwitchListTile.adaptive(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Telemetry sweep',
+                                style: TextStyle(fontWeight: FontWeight.w700)),
+                            subtitle: Text(
+                                'Move a live scan across the display',
+                                style: TextStyle(
+                                    color: Colors.white.withOpacity(0.42),
+                                    fontSize: 12)),
+                            value: _draft.showSweep,
+                            activeColor: _draft.primary,
+                            onChanged: (value) =>
+                                _update(_draft.copyWith(showSweep: value)),
+                          ),
+                          SwitchListTile.adaptive(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Peak pulse',
+                                style: TextStyle(fontWeight: FontWeight.w700)),
+                            subtitle: Text(
+                                'Pulse the signal markers while testing',
+                                style: TextStyle(
+                                    color: Colors.white.withOpacity(0.42),
+                                    fontSize: 12)),
+                            value: _draft.showPulse,
+                            activeColor: _draft.primary,
+                            onChanged: (value) =>
+                                _update(_draft.copyWith(showPulse: value)),
                           ),
                         ],
                       ),
@@ -312,61 +330,6 @@ class _GarageHeader extends StatelessWidget {
                 TextStyle(color: Colors.white.withOpacity(0.50), height: 1.35)),
       ],
     );
-  }
-}
-
-class _ColorSelector extends StatelessWidget {
-  const _ColorSelector({required this.draft, required this.onChanged});
-
-  final BlazeTheme draft;
-  final ValueChanged<BlazeTheme> onChanged;
-
-  static const colors = [
-    Color(0xFFFF6A3D),
-    Color(0xFFFF3B30),
-    Color(0xFFFFC857),
-    Color(0xFF42D6FF),
-    Color(0xFF8BFF74),
-    Color(0xFFFF4ECD),
-    Color(0xFF9B8CFF),
-    Color(0xFFFFFFFF),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 12,
-      children: colors.map((color) {
-        final selected = draft.primary.value == color.value;
-        return GestureDetector(
-          onTap: () => onChanged(
-              draft.copyWith(primary: color, secondary: _secondary(color))),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            height: 40,
-            width: 40,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-              border: Border.all(
-                  color: selected ? Colors.white : Colors.transparent,
-                  width: 3),
-              boxShadow: selected
-                  ? [BoxShadow(color: color.withOpacity(0.45), blurRadius: 14)]
-                  : null,
-            ),
-            child: selected
-                ? const Icon(Icons.check, color: Colors.black, size: 18)
-                : null,
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Color _secondary(Color color) {
-    if (color == const Color(0xFFFFFFFF)) return const Color(0xFFE0E0E0);
-    return Color.lerp(color, Colors.white, 0.55) ?? Colors.white;
   }
 }
 
