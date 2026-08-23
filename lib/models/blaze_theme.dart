@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 
-enum GaugeStyle { classic, telemetry, electric, neon }
+enum GaugeStyle { classic, f1, motoGp, electric, neon }
 
 extension GaugeStyleLabel on GaugeStyle {
   String get label {
     switch (this) {
       case GaugeStyle.classic:
         return 'Classic';
-      case GaugeStyle.telemetry:
-        return 'Telemetry';
+      case GaugeStyle.f1:
+        return 'F1 Telemetry';
+      case GaugeStyle.motoGp:
+        return 'MotoGP';
       case GaugeStyle.electric:
         return 'Electric';
       case GaugeStyle.neon:
@@ -136,7 +138,7 @@ class BlazeTheme {
       secondary: Color(0xFFFFD166),
       background: Color(0xFF120A0D),
       surface: Color(0xFF211114),
-      gaugeStyle: GaugeStyle.telemetry,
+      gaugeStyle: GaugeStyle.f1,
       maxSpeed: 2000,
       motion: 0.92,
       showGrid: true,
@@ -150,7 +152,7 @@ class BlazeTheme {
       secondary: Color(0xFFB3F4FF),
       background: Color(0xFF061116),
       surface: Color(0xFF0B2028),
-      gaugeStyle: GaugeStyle.neon,
+      gaugeStyle: GaugeStyle.motoGp,
       maxSpeed: 800,
       motion: 0.88,
       showGrid: false,

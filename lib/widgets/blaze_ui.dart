@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/blaze_theme.dart';
+import 'blaze_gauge.dart';
 
 class BlazeCard extends StatelessWidget {
   const BlazeCard(
@@ -156,42 +157,4 @@ class ThemePreview extends StatelessWidget {
       ),
     );
   }
-}
-
-class MiniGaugePainter extends CustomPainter {
-  const MiniGaugePainter({required this.theme});
-
-  final BlazeTheme theme;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height * 0.68);
-    final radius = size.height * 0.82;
-    const start = 3.72;
-    const sweep = 2.84;
-    final rect = Rect.fromCircle(center: center, radius: radius);
-    final track = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 8
-      ..strokeCap = StrokeCap.round
-      ..color = Colors.white.withOpacity(0.10);
-    canvas.drawArc(rect, start, sweep, false, track);
-    final accent = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 8
-      ..strokeCap = StrokeCap.round
-      ..color = theme.primary;
-    canvas.drawArc(rect, start, sweep * 0.68, false, accent);
-    canvas.drawCircle(center, 5, Paint()..color = theme.primary);
-    canvas.drawLine(
-        center,
-        center - Offset(radius * 0.55, radius * 0.04),
-        Paint()
-          ..color = Colors.white
-          ..strokeWidth = 2);
-  }
-
-  @override
-  bool shouldRepaint(covariant MiniGaugePainter oldDelegate) =>
-      oldDelegate.theme.id != theme.id;
 }

@@ -116,10 +116,11 @@ class BlazeController extends ChangeNotifier {
       phase = TestPhase.finished;
       _persistHistory();
       notifyListeners();
-    } catch (_) {
+    } catch (error) {
       phase = TestPhase.error;
-      errorMessage =
-          'The test could not finish. Check your connection and try again.';
+      errorMessage = error is SpeedTestException
+          ? error.message
+          : 'The test could not finish. Check your connection and try again.';
       notifyListeners();
     }
   }

@@ -171,7 +171,8 @@ class _GarageScreenState extends State<GarageScreen> {
                             contentPadding: EdgeInsets.zero,
                             title: const Text('Technical grid',
                                 style: TextStyle(fontWeight: FontWeight.w700)),
-                            subtitle: Text('Add telemetry lines to the dial',
+                            subtitle: Text(
+                                'Add technical data lines to the dial',
                                 style: TextStyle(
                                     color: Colors.white.withOpacity(0.42),
                                     fontSize: 12)),
@@ -272,8 +273,10 @@ class _GarageScreenState extends State<GarageScreen> {
     switch (style) {
       case GaugeStyle.classic:
         return Icons.speed_rounded;
-      case GaugeStyle.telemetry:
-        return Icons.monitor_heart_outlined;
+      case GaugeStyle.f1:
+        return Icons.sports_motorsports_rounded;
+      case GaugeStyle.motoGp:
+        return Icons.two_wheeler_rounded;
       case GaugeStyle.electric:
         return Icons.bolt_rounded;
       case GaugeStyle.neon:

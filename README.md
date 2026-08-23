@@ -8,9 +8,11 @@ Blaze is an Android-first internet speed tester built with Flutter. Its defining
 - Blaze home speedometer
 - Blaze Garage customization flow
 - Six original dashboard presets
+- Dedicated F1 telemetry and MotoGP dashboard layouts
 - Gauge style, accent color, speed scale, motion, grid, and glow controls
 - Saved custom dashboards using local storage
-- Real ping, download, and upload measurements
+- Multi-sample ping, concurrent download, and concurrent upload measurements
+- Incomplete-response validation and confidence/data-usage reporting
 - Local test history
 - Shareable result text
 - Manual-only GitHub Actions build workflow
@@ -24,7 +26,7 @@ flutter test
 flutter run
 ```
 
-The app uses Cloudflare's public speed-test endpoints for the first working MVP. The speed-test service is isolated in `lib/services/speed_test_service.dart` so it can be replaced with Blaze-owned regional test servers later.
+The app currently uses Cloudflare's public speed-test endpoints. The measurement service ramps through multiple request sizes and concurrent streams, rejects incomplete responses instead of saving a number, and reports the amount of data sampled. It is isolated in `lib/services/speed_test_service.dart` so it can be replaced with Blaze-owned regional test servers later.
 
 ## GitHub Actions
 
@@ -32,4 +34,4 @@ The workflow in `.github/workflows/android-build.yml` is intentionally configure
 
 ## Rendering approach
 
-The main dial is drawn with Flutter's `CustomPainter` instead of a fixed image. Dashboard properties are modeled as data, so new dashboard styles can be added without rewriting the test screen.
+The main dashboards are drawn with Flutter's `CustomPainter` instead of a fixed image. F1 uses a rectangular telemetry panel with shift LEDs, speed screen, DL/UL bars, and telemetry blocks. MotoGP uses a race-display cluster with arc indicators, gear/lean fields, and side data rails. Dashboard properties are modeled as data, so new styles can be added without rewriting the test screen.

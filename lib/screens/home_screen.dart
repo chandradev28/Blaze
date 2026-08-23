@@ -54,6 +54,14 @@ class HomeScreen extends StatelessWidget {
                       theme: theme,
                       value: value,
                       phase: controller.phase,
+                      download: result?.download ??
+                          (controller.phase == TestPhase.download
+                              ? value
+                              : null),
+                      upload: result?.upload ??
+                          (controller.phase == TestPhase.upload ? value : null),
+                      ping: result?.ping,
+                      jitter: result?.jitter,
                       height: 350),
                   const SizedBox(height: 4),
                   _StartButton(controller: controller),
@@ -285,7 +293,7 @@ class _IdleHint extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-                'Blaze uses a few megabytes to measure your connection. Wi-Fi recommended for your first run.',
+                'A full run samples about 22 MB across multiple requests. Wi-Fi recommended for your first run.',
                 style: TextStyle(
                     color: Colors.white.withOpacity(0.56),
                     fontSize: 12,
@@ -373,6 +381,14 @@ class _ResultCard extends StatelessWidget {
                 unit: 'ms'),
           ]),
           const SizedBox(height: 16),
+          Text(
+              '${_confidenceLabel(result)}  •  ${_megabytes(result.bytesUsed)} MB sampled',
+              style: TextStyle(
+                  color: theme.secondary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8)),
+          const SizedBox(height: 7),
           Text('${result.provider}  •  ${result.server}',
               style: TextStyle(
                   color: Colors.white.withOpacity(0.38), fontSize: 11)),
@@ -380,4 +396,12 @@ class _ResultCard extends StatelessWidget {
       ),
     );
   }
+
+  String _confidenceLabel(SpeedResult result) {
+    if (result.confidence >= 0.75) return 'HIGH CONFIDENCE';
+    if (result.confidence >= 0.45) return 'MEDIUM CONFIDENCE';
+    return 'LOW CONFIDENCE';
+  }
+
+  String _megabytes(int bytes) => (bytes / (1024 * 1024)).toStringAsFixed(1);
 }
