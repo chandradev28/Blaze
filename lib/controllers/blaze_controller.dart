@@ -1,0 +1,147 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../models/blaze_theme.dart';
+import '../models/speed_result.dart';
+import '../services/speed_test_service.dart';
+
+class BlazeController extends ChangeNotifier {
+  BlazeController({SpeedTestService? speedTestService})
+      : _speedTestService = speedTestService ?? SpeedTestService();
+
+  static const _activeThemeKey = 'active_theme';
+  static const _savedThemesKey = 'saved_themes';
+  static const _historyKey = 'history';
+
+  final SpeedTestService _speedTestService;
+  SharedPreferences? _preferences;
+  BlazeTheme activeTheme = BlazeTheme.presets.first;
+  List<BlazeTheme> savedThemes = [];
+  List<SpeedResult> history = [];
+  SpeedResult? latestResult;
+  TestPhase phase = TestPhase.idle;
+  double gaugeValue = 0;
+  String? errorMessage;
+
+  bool get isTesting =>
+      phase != TestPhase.idle &&
+      phase != TestPhase.finished &&
+      phase != TestPhase.error;
+
+  Future<void> hydrate() async {
+    _preferences = await SharedPreferences.getInstance();
+    final activeId = _preferences?.getString(_activeThemeKey);
+    final saved = _preferences?.getStringList(_savedThemesKey) ?? [];
+    savedThemes = saved.map(_decodeTheme).whereType<BlazeTheme>().toList();
+    activeTheme = _findTheme(activeId) ?? activeTheme;
+    final storedHistory = _preferences?.getStringList(_historyKey) ?? [];
+    history =
+        storedHistory.map(_decodeResult).whereType<SpeedResult>().toList();
+    latestResult = history.isEmpty ? null : history.first;
+    notifyListeners();
+  }
+
+  BlazeTheme? _decodeTheme(String item) {
+    try {
+      return BlazeTheme.fromJson(jsonDecode(item) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  SpeedResult? _decodeResult(String item) {
+    try {
+      return SpeedResult.fromJson(jsonDecode(item) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  BlazeTheme? _findTheme(String? id) {
+    if (id == null) return null;
+    for (final theme in [...BlazeTheme.presets, ...savedThemes]) {
+      if (theme.id == id) return theme;
+    }
+    return null;
+  }
+
+  void selectTheme(BlazeTheme theme) {
+    activeTheme = theme;
+    _preferences?.setString(_activeThemeKey, theme.id);
+    notifyListeners();
+  }
+
+  void saveTheme(BlazeTheme theme) {
+    final saved = theme.copyWith(
+      id: 'saved-${DateTime.now().microsecondsSinceEpoch}',
+      subtitle: 'Your custom build',
+    );
+    savedThemes = [saved, ...savedThemes];
+    selectTheme(saved);
+    _persistThemes();
+  }
+
+  void deleteTheme(BlazeTheme theme) {
+    savedThemes = savedThemes.where((item) => item.id != theme.id).toList();
+    if (activeTheme.id == theme.id) {
+      selectTheme(BlazeTheme.presets.first);
+    }
+    _persistThemes();
+    notifyListeners();
+  }
+
+  Future<void> startTest() async {
+    if (isTesting) return;
+    errorMessage = null;
+    gaugeValue = 0;
+    latestResult = null;
+    phase = TestPhase.connecting;
+    notifyListeners();
+    try {
+      final result = await _speedTestService.run(
+        onPhase: (nextPhase) {
+          phase = nextPhase;
+          gaugeValue = 0;
+          notifyListeners();
+        },
+        onProgress: (progress) {
+          gaugeValue = progress;
+          notifyListeners();
+        },
+      );
+      latestResult = result;
+      history = [result, ...history].take(20).toList();
+      phase = TestPhase.finished;
+      _persistHistory();
+      notifyListeners();
+    } catch (_) {
+      phase = TestPhase.error;
+      errorMessage =
+          'The test could not finish. Check your connection and try again.';
+      notifyListeners();
+    }
+  }
+
+  void resetTest() {
+    phase = TestPhase.idle;
+    gaugeValue = 0;
+    errorMessage = null;
+    notifyListeners();
+  }
+
+  Future<void> _persistThemes() async {
+    await _preferences?.setStringList(
+      _savedThemesKey,
+      savedThemes.map((theme) => jsonEncode(theme.toJson())).toList(),
+    );
+  }
+
+  Future<void> _persistHistory() async {
+    await _preferences?.setStringList(
+      _historyKey,
+      history.map((result) => jsonEncode(result.toJson())).toList(),
+    );
+  }
+}
