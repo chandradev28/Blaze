@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -6,17 +7,24 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/blaze_theme.dart';
 import '../models/speed_result.dart';
+import '../services/network_monitor.dart';
 import '../services/speed_test_service.dart';
 
 class BlazeController extends ChangeNotifier {
-  BlazeController({SpeedTestService? speedTestService})
-      : _speedTestService = speedTestService ?? SpeedTestService();
+  BlazeController({
+    SpeedTestService? speedTestService,
+    NetworkMonitor? networkMonitor,
+  })  : _speedTestService = speedTestService ?? SpeedTestService(),
+        _networkMonitor = networkMonitor ?? ConnectivityNetworkMonitor();
 
   static const _activeThemeKey = 'active_theme';
   static const _savedThemesKey = 'saved_themes';
   static const _historyKey = 'history';
+  static const _fireEffectsKey = 'fire_effects_enabled';
 
   final SpeedTestService _speedTestService;
+  final NetworkMonitor _networkMonitor;
+  StreamSubscription<NetworkSnapshot>? _networkSubscription;
   SharedPreferences? _preferences;
   BlazeTheme activeTheme = BlazeTheme.presets.first;
   List<BlazeTheme> savedThemes = [];
@@ -27,7 +35,12 @@ class BlazeController extends ChangeNotifier {
   double liveSpeed = 0;
   double peakSpeed = 0;
   String? errorMessage;
+  NetworkSnapshot network = const NetworkSnapshot.unknown();
+  bool fireEffectsEnabled = true;
+  bool _blazeModeLatched = false;
   DateTime? _lastProgressNotify;
+
+  bool get blazeModeActive => fireEffectsEnabled && _blazeModeLatched;
 
   double get dialMax {
     final observed = math.max(liveSpeed, peakSpeed);
@@ -50,6 +63,32 @@ class BlazeController extends ChangeNotifier {
     history =
         storedHistory.map(_decodeResult).whereType<SpeedResult>().toList();
     latestResult = history.isEmpty ? null : history.first;
+    fireEffectsEnabled = _preferences?.getBool(_fireEffectsKey) ?? true;
+    if (latestResult != null &&
+        math.max(latestResult!.download, latestResult!.upload) >= 800) {
+      _blazeModeLatched = true;
+    }
+    await _refreshNetwork();
+    await _networkSubscription?.cancel();
+    _networkSubscription = _networkMonitor.changes.listen((snapshot) {
+      network = snapshot;
+      notifyListeners();
+    });
+    notifyListeners();
+  }
+
+  Future<void> _refreshNetwork() async {
+    try {
+      network = await _networkMonitor.check();
+    } catch (_) {
+      network = const NetworkSnapshot.unknown();
+    }
+  }
+
+  void setFireEffectsEnabled(bool enabled) {
+    if (fireEffectsEnabled == enabled) return;
+    fireEffectsEnabled = enabled;
+    _preferences?.setBool(_fireEffectsKey, enabled);
     notifyListeners();
   }
 
@@ -104,10 +143,19 @@ class BlazeController extends ChangeNotifier {
 
   Future<void> startTest() async {
     if (isTesting) return;
+    await _refreshNetwork();
+    if (!network.isConnected) {
+      phase = TestPhase.error;
+      errorMessage =
+          'No active internet connection. Connect mobile data, Wi-Fi, or a hotspot and retry.';
+      notifyListeners();
+      return;
+    }
     errorMessage = null;
     gaugeValue = 0;
     liveSpeed = 0;
     peakSpeed = 0;
+    _blazeModeLatched = false;
     _lastProgressNotify = null;
     latestResult = null;
     phase = TestPhase.connecting;
@@ -128,12 +176,18 @@ class BlazeController extends ChangeNotifier {
         },
         onProgress: (progress) {
           gaugeValue = progress.fraction;
+          var blazeModeChanged = false;
           if (progress.speedMbps > 0) {
             liveSpeed = progress.speedMbps;
             peakSpeed = math.max(peakSpeed, progress.speedMbps);
+            if (progress.speedMbps >= 800 && !_blazeModeLatched) {
+              _blazeModeLatched = true;
+              blazeModeChanged = true;
+            }
           }
           final now = DateTime.now();
-          if (progress.fraction < 1 &&
+          if (!blazeModeChanged &&
+              progress.fraction < 1 &&
               _lastProgressNotify != null &&
               now.difference(_lastProgressNotify!).inMilliseconds < 42) {
             return;
@@ -143,6 +197,9 @@ class BlazeController extends ChangeNotifier {
         },
       );
       latestResult = result;
+      if (math.max(result.download, result.upload) >= 800) {
+        _blazeModeLatched = true;
+      }
       liveSpeed = result.download;
       peakSpeed = math.max(peakSpeed, result.download);
       history = [result, ...history].take(20).toList();
@@ -151,6 +208,7 @@ class BlazeController extends ChangeNotifier {
       notifyListeners();
     } catch (error) {
       phase = TestPhase.error;
+      _blazeModeLatched = false;
       errorMessage = error is SpeedTestException
           ? error.message
           : 'The test could not finish. Check your connection and try again.';
@@ -164,7 +222,14 @@ class BlazeController extends ChangeNotifier {
     liveSpeed = 0;
     peakSpeed = 0;
     errorMessage = null;
+    _blazeModeLatched = false;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _networkSubscription?.cancel();
+    super.dispose();
   }
 
   double _niceCeiling(double value) {

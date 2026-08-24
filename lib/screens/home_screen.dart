@@ -8,6 +8,7 @@ import '../models/speed_result.dart';
 import '../services/speed_test_service.dart';
 import '../widgets/blaze_gauge.dart';
 import '../widgets/blaze_ui.dart';
+import '../widgets/fire_backdrop.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({required this.controller, super.key});
@@ -46,6 +47,21 @@ class _HomeScreenState extends State<HomeScreen> {
     widget.controller.selectTheme(_profiles[index].theme);
   }
 
+  void _openSettings(BlazeController controller, BlazeTheme theme) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withOpacity(0.72),
+      builder: (context) => AnimatedBuilder(
+        animation: controller,
+        builder: (context, _) => _SettingsSheet(
+          controller: controller,
+          theme: theme,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -56,115 +72,152 @@ class _HomeScreenState extends State<HomeScreen> {
         final theme = selectedProfile.theme;
         final result = controller.latestResult;
         final value = _gaugeValue(controller);
-        return Container(
+        return ColoredBox(
           color: Colors.black,
-          child: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _Header(theme: theme),
-                  const SizedBox(height: 14),
-                  Row(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              FireBackdrop(
+                active: controller.blazeModeActive,
+                accent: theme.primary,
+              ),
+              SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _StatusPill(
-                          phase: controller.phase,
-                          isTesting: controller.isTesting),
-                      const Spacer(),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 240),
-                        transitionBuilder: (child, animation) => FadeTransition(
-                          opacity: animation,
-                          child: SlideTransition(
-                            position: Tween<Offset>(
-                              begin: const Offset(0.08, 0),
-                              end: Offset.zero,
-                            ).animate(animation),
-                            child: child,
+                      _Header(
+                        theme: theme,
+                        networkLabel: controller.network.label,
+                        onSettings: () => _openSettings(controller, theme),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          _StatusPill(
+                              phase: controller.phase,
+                              isTesting: controller.isTesting),
+                          const Spacer(),
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 240),
+                            transitionBuilder: (child, animation) =>
+                                FadeTransition(
+                              opacity: animation,
+                              child: SlideTransition(
+                                position: Tween<Offset>(
+                                  begin: const Offset(0.08, 0),
+                                  end: Offset.zero,
+                                ).animate(animation),
+                                child: child,
+                              ),
+                            ),
+                            child: controller.blazeModeActive
+                                ? Row(
+                                    key: const ValueKey('blaze-mode'),
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.local_fire_department_rounded,
+                                        color: Colors.orange.shade300,
+                                        size: 14,
+                                      ),
+                                      const SizedBox(width: 5),
+                                      const Text(
+                                        'BLAZE MODE',
+                                        style: TextStyle(
+                                          color: Color(0xFFFFB24A),
+                                          fontSize: 10,
+                                          letterSpacing: 1.4,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : Text(
+                                    selectedProfile.name.toUpperCase(),
+                                    key: ValueKey(selectedProfile.themeId),
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.58),
+                                      fontSize: 10,
+                                      letterSpacing: 1.6,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
                           ),
-                        ),
-                        child: Text(
-                          selectedProfile.name.toUpperCase(),
-                          key: ValueKey(selectedProfile.themeId),
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.58),
-                            fontSize: 10,
-                            letterSpacing: 1.6,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 9),
+                      _PhaseTrack(
+                        progress: controller.gaugeValue,
+                        isTesting: controller.isTesting,
+                        color: theme.primary,
+                      ),
+                      const SizedBox(height: 4),
+                      SizedBox(
+                        height: 362,
+                        child: PageView.builder(
+                          controller: _profileController,
+                          itemCount: _profiles.length,
+                          onPageChanged: _selectProfile,
+                          physics: const BouncingScrollPhysics(),
+                          itemBuilder: (context, index) {
+                            final profile = _profiles[index];
+                            return BlazeGauge(
+                              theme: profile.theme,
+                              profile: profile,
+                              value: value,
+                              phase: controller.phase,
+                              download: result?.download ??
+                                  (controller.phase == TestPhase.download
+                                      ? value
+                                      : null),
+                              upload: result?.upload ??
+                                  (controller.phase == TestPhase.upload
+                                      ? value
+                                      : null),
+                              ping: result?.ping,
+                              jitter: result?.jitter,
+                              scaleMax: profile.usesPhoto
+                                  ? profile.theme.maxSpeed.toDouble()
+                                  : controller.dialMax,
+                              height: 350,
+                            );
+                          },
                         ),
                       ),
+                      _SwipeHint(
+                        index: _profileIndex,
+                        count: _profiles.length,
+                        color: theme.primary,
+                      ),
+                      const SizedBox(height: 14),
+                      _StartButton(controller: controller, theme: theme),
+                      const SizedBox(height: 12),
+                      if (controller.errorMessage != null)
+                        _ErrorCard(
+                            message: controller.errorMessage!,
+                            onRetry: controller.startTest),
+                      if (result != null &&
+                          controller.phase == TestPhase.finished) ...[
+                        const SizedBox(height: 14),
+                        _ResultCard(result: result, theme: theme),
+                      ],
+                      if (result == null &&
+                          controller.phase == TestPhase.idle) ...[
+                        const SizedBox(height: 12),
+                        Text('Swipe the dial to choose a profile',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                color: Colors.white.withOpacity(0.38),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700)),
+                      ],
                     ],
                   ),
-                  const SizedBox(height: 9),
-                  _PhaseTrack(
-                    progress: controller.gaugeValue,
-                    isTesting: controller.isTesting,
-                    color: theme.primary,
-                  ),
-                  const SizedBox(height: 4),
-                  SizedBox(
-                    height: 362,
-                    child: PageView.builder(
-                      controller: _profileController,
-                      itemCount: _profiles.length,
-                      onPageChanged: _selectProfile,
-                      physics: const BouncingScrollPhysics(),
-                      itemBuilder: (context, index) {
-                        final profile = _profiles[index];
-                        return BlazeGauge(
-                          theme: profile.theme,
-                          profile: profile,
-                          value: value,
-                          phase: controller.phase,
-                          download: result?.download ??
-                              (controller.phase == TestPhase.download
-                                  ? value
-                                  : null),
-                          upload: result?.upload ??
-                              (controller.phase == TestPhase.upload
-                                  ? value
-                                  : null),
-                          ping: result?.ping,
-                          jitter: result?.jitter,
-                          scaleMax: profile.usesPhoto
-                              ? profile.theme.maxSpeed.toDouble()
-                              : controller.dialMax,
-                          height: 350,
-                        );
-                      },
-                    ),
-                  ),
-                  _SwipeHint(
-                    index: _profileIndex,
-                    count: _profiles.length,
-                    color: theme.primary,
-                  ),
-                  const SizedBox(height: 14),
-                  _StartButton(controller: controller, theme: theme),
-                  const SizedBox(height: 12),
-                  if (controller.errorMessage != null)
-                    _ErrorCard(
-                        message: controller.errorMessage!,
-                        onRetry: controller.startTest),
-                  if (result != null &&
-                      controller.phase == TestPhase.finished) ...[
-                    const SizedBox(height: 14),
-                    _ResultCard(result: result, theme: theme),
-                  ],
-                  if (result == null && controller.phase == TestPhase.idle) ...[
-                    const SizedBox(height: 12),
-                    Text('Swipe the dial to choose a profile',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            color: Colors.white.withOpacity(0.38),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700)),
-                  ],
-                ],
+                ),
               ),
-            ),
+            ],
           ),
         );
       },
@@ -254,9 +307,15 @@ class _PhaseTrack extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.theme});
+  const _Header({
+    required this.theme,
+    required this.networkLabel,
+    required this.onSettings,
+  });
 
   final dynamic theme;
+  final String networkLabel;
+  final VoidCallback onSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -280,15 +339,175 @@ class _Header extends StatelessWidget {
         ),
         const Spacer(),
         Text(
-          'SPEED  /  Mbps',
+          networkLabel,
           style: TextStyle(
             color: Colors.white.withOpacity(0.32),
-            fontSize: 9,
+            fontSize: 8,
             fontWeight: FontWeight.w600,
-            letterSpacing: 1.2,
+            letterSpacing: 0.9,
+          ),
+        ),
+        const SizedBox(width: 5),
+        IconButton(
+          tooltip: 'Settings',
+          onPressed: onSettings,
+          visualDensity: VisualDensity.compact,
+          icon: Icon(
+            Icons.tune_rounded,
+            color: Colors.white.withOpacity(0.58),
+            size: 20,
           ),
         ),
       ],
+    );
+  }
+}
+
+class _SettingsSheet extends StatelessWidget {
+  const _SettingsSheet({required this.controller, required this.theme});
+
+  final BlazeController controller;
+  final BlazeTheme theme;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(22, 12, 22, 26),
+        decoration: const BoxDecoration(
+          color: Color(0xFF0B0B0D),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                height: 4,
+                width: 38,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'SETTINGS',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 2.2,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Container(
+                  height: 44,
+                  width: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF3B18).withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.local_fire_department_rounded,
+                    color: Color(0xFFFF6A35),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Blaze Mode',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Fire and haptic effect when live speed reaches 800 Mbps.',
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: 11,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Switch.adaptive(
+                  value: controller.fireEffectsEnabled,
+                  activeColor: theme.primary,
+                  onChanged: controller.setFireEffectsEnabled,
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'ACTIVE CONNECTION',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.34),
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.4,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              controller.network.label,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Wrap(
+              spacing: 7,
+              runSpacing: 7,
+              children: [
+                _NetworkChip('CELLULAR'),
+                _NetworkChip('WI-FI'),
+                _NetworkChip('HOTSPOT'),
+                _NetworkChip('VPN'),
+                _NetworkChip('ETHERNET'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NetworkChip extends StatelessWidget {
+  const _NetworkChip(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.055),
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white54,
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
+        ),
+      ),
     );
   }
 }
