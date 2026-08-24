@@ -19,7 +19,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 120));
 
     expect(find.text('BLAZE'), findsOneWidget);
-    expect(find.text('GO'), findsOneWidget);
+    expect(find.text('ACCELERATE'), findsOneWidget);
     expect(find.text('CLASSIC 140'), findsOneWidget);
     expect(find.byType(PageView), findsOneWidget);
     expect(find.text('Garage'), findsNothing);

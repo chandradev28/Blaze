@@ -9,6 +9,7 @@ import '../services/speed_test_service.dart';
 import '../widgets/blaze_gauge.dart';
 import '../widgets/blaze_ui.dart';
 import '../widgets/fire_backdrop.dart';
+import '../widgets/garage_chrome.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({required this.controller, super.key});
@@ -77,6 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Stack(
             fit: StackFit.expand,
             children: [
+              GarageBackdrop(accent: theme.primary),
               FireBackdrop(
                 active: controller.blazeModeActive,
                 accent: theme.primary,
@@ -147,43 +149,40 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 9),
-                      _PhaseTrack(
-                        progress: controller.gaugeValue,
-                        isTesting: controller.isTesting,
-                        color: theme.primary,
-                      ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 10),
                       SizedBox(
-                        height: 362,
-                        child: PageView.builder(
-                          controller: _profileController,
-                          itemCount: _profiles.length,
-                          onPageChanged: _selectProfile,
-                          physics: const BouncingScrollPhysics(),
-                          itemBuilder: (context, index) {
-                            final profile = _profiles[index];
-                            return BlazeGauge(
-                              theme: profile.theme,
-                              profile: profile,
-                              value: value,
-                              phase: controller.phase,
-                              download: result?.download ??
-                                  (controller.phase == TestPhase.download
-                                      ? value
-                                      : null),
-                              upload: result?.upload ??
-                                  (controller.phase == TestPhase.upload
-                                      ? value
-                                      : null),
-                              ping: result?.ping,
-                              jitter: result?.jitter,
-                              scaleMax: profile.usesPhoto
-                                  ? profile.theme.maxSpeed.toDouble()
-                                  : controller.dialMax,
-                              height: 350,
-                            );
-                          },
+                        height: 374,
+                        child: ChromeGaugeStage(
+                          accent: theme.primary,
+                          child: PageView.builder(
+                            controller: _profileController,
+                            itemCount: _profiles.length,
+                            onPageChanged: _selectProfile,
+                            physics: const BouncingScrollPhysics(),
+                            itemBuilder: (context, index) {
+                              final profile = _profiles[index];
+                              return BlazeGauge(
+                                theme: profile.theme,
+                                profile: profile,
+                                value: value,
+                                phase: controller.phase,
+                                download: result?.download ??
+                                    (controller.phase == TestPhase.download
+                                        ? value
+                                        : null),
+                                upload: result?.upload ??
+                                    (controller.phase == TestPhase.upload
+                                        ? value
+                                        : null),
+                                ping: result?.ping,
+                                jitter: result?.jitter,
+                                scaleMax: profile.usesPhoto
+                                    ? profile.theme.maxSpeed.toDouble()
+                                    : controller.dialMax,
+                                height: 350,
+                              );
+                            },
+                          ),
                         ),
                       ),
                       _SwipeHint(
@@ -279,33 +278,6 @@ class _SwipeHint extends StatelessWidget {
   }
 }
 
-class _PhaseTrack extends StatelessWidget {
-  const _PhaseTrack({
-    required this.progress,
-    required this.isTesting,
-    required this.color,
-  });
-
-  final double progress;
-  final bool isTesting;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: SizedBox(
-        height: 2,
-        child: LinearProgressIndicator(
-          value: isTesting ? progress.clamp(0.0, 1.0) : 0,
-          backgroundColor: Colors.white.withOpacity(0.05),
-          valueColor: AlwaysStoppedAnimation(color),
-        ),
-      ),
-    );
-  }
-}
-
 class _Header extends StatelessWidget {
   const _Header({
     required this.theme,
@@ -348,15 +320,11 @@ class _Header extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 5),
-        IconButton(
+        ChromeIconButton(
           tooltip: 'Settings',
           onPressed: onSettings,
-          visualDensity: VisualDensity.compact,
-          icon: Icon(
-            Icons.tune_rounded,
-            color: Colors.white.withOpacity(0.58),
-            size: 20,
-          ),
+          icon: Icons.tune_rounded,
+          accent: theme.primary,
         ),
       ],
     );
@@ -615,77 +583,136 @@ class _StatusPill extends StatelessWidget {
   }
 }
 
-class _StartButton extends StatelessWidget {
+class _StartButton extends StatefulWidget {
   const _StartButton({required this.controller, required this.theme});
 
   final BlazeController controller;
   final BlazeTheme theme;
 
   @override
+  State<_StartButton> createState() => _StartButtonState();
+}
+
+class _StartButtonState extends State<_StartButton> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value || !mounted) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final controller = widget.controller;
+    final theme = widget.theme;
     final canStart = !controller.isTesting;
     final finished = controller.phase == TestPhase.finished;
     return Center(
       child: Semantics(
         button: true,
         label: finished ? 'Test again' : 'Start speed test',
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: canStart ? controller.startTest : null,
-            customBorder: const CircleBorder(),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: canStart ? (_) => _setPressed(true) : null,
+          onTapCancel: canStart ? () => _setPressed(false) : null,
+          onTapUp: canStart
+              ? (_) {
+                  _setPressed(false);
+                  controller.startTest();
+                }
+              : null,
+          child: AnimatedScale(
+            scale: _pressed ? 0.965 : 1,
+            duration: const Duration(milliseconds: 110),
+            curve: Curves.easeOut,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutCubic,
-              height: 78,
-              width: 78,
+              duration: const Duration(milliseconds: 230),
+              height: 72,
+              width: 216,
+              transform: Matrix4.translationValues(0, _pressed ? 3 : 0, 0),
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFF0B0B0D),
-                border: Border.all(
-                  color: theme.primary.withOpacity(canStart ? 0.82 : 0.28),
-                  width: 1.5,
-                ),
+                borderRadius: BorderRadius.circular(22),
                 boxShadow: [
                   BoxShadow(
                     color: theme.primary.withOpacity(
-                      controller.isTesting ? 0.10 : 0.28,
+                      controller.isTesting ? 0.14 : 0.25,
                     ),
-                    blurRadius: controller.isTesting ? 12 : 25,
-                    spreadRadius: controller.isTesting ? 0 : 2,
+                    blurRadius: controller.isTesting ? 15 : 28,
+                    spreadRadius: controller.isTesting ? 0 : 1,
+                    offset: const Offset(0, 8),
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.76),
+                    blurRadius: 10,
+                    offset: const Offset(0, 7),
                   ),
                 ],
               ),
-              child: controller.isTesting
-                  ? Padding(
-                      padding: const EdgeInsets.all(23),
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: theme.primary,
-                        backgroundColor: Colors.white.withOpacity(0.08),
+              child: CustomPaint(
+                painter: AcceleratorPedalPainter(
+                  accent: theme.primary,
+                  active: controller.isTesting,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(76, 0, 16, 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'ACCELERATE',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              controller.isTesting
+                                  ? 'FULL THROTTLE'
+                                  : finished
+                                      ? 'RUN AGAIN'
+                                      : 'TAP TO TEST',
+                              style: TextStyle(
+                                color: controller.isTesting
+                                    ? theme.primary
+                                    : Colors.white.withOpacity(0.42),
+                                fontSize: 8,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    )
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
+                      if (controller.isTesting)
+                        SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            value: controller.gaugeValue.clamp(0.0, 1.0),
+                            strokeWidth: 2,
+                            color: theme.primary,
+                            backgroundColor: Colors.white12,
+                          ),
+                        )
+                      else
                         Icon(
                           finished
                               ? Icons.refresh_rounded
-                              : Icons.play_arrow_rounded,
-                          color: Colors.white,
-                          size: 25,
+                              : Icons.keyboard_double_arrow_up_rounded,
+                          color: theme.primary,
+                          size: 23,
                         ),
-                        Text(
-                          finished ? 'AGAIN' : 'GO',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.62),
-                            fontSize: 8,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                      ],
-                    ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
         ),
@@ -738,12 +765,8 @@ class _ResultCard extends StatelessWidget {
           child: child,
         ),
       ),
-      child: Container(
+      child: ChromePanel(
         padding: const EdgeInsets.fromLTRB(18, 17, 18, 16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF09090B),
-          borderRadius: BorderRadius.circular(24),
-        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -762,11 +785,12 @@ class _ResultCard extends StatelessWidget {
                           fontSize: 20, fontWeight: FontWeight.w900)),
                 ]),
                 const Spacer(),
-                IconButton(
+                ChromeIconButton(
                   tooltip: 'Share result',
                   onPressed: () =>
                       Share.share(shareText, subject: 'My Blaze speed test'),
-                  icon: Icon(Icons.ios_share_rounded, color: theme.primary),
+                  icon: Icons.ios_share_rounded,
+                  accent: theme.primary,
                 ),
               ],
             ),

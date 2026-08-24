@@ -6,6 +6,8 @@ Blaze is an Android-first internet speed tester built with Flutter. Its defining
 
 - Android-only Flutter app
 - Pure-black stage with fixed dashboard palettes
+- Carbon-fiber garage console with brushed-chrome gauge and control frames
+- Pressable accelerator-pedal test control with active throttle feedback
 - Blaze home speedometer
 - Motorcycle-style physical dial with live decimal Mbps readout
 - One minimal Ookla-style test page
@@ -20,7 +22,7 @@ Blaze is an Android-first internet speed tester built with Flutter. Its defining
 - Incomplete-response validation and confidence/data-usage reporting
 - Inline results and shareable result text on the main page
 - Optional persistent Blaze Mode: animated full-screen fire, embers, glow, and haptics at 800+ Mbps
-- Manual-only GitHub Actions build workflow
+- Manual-only GitHub Actions workflow that publishes a clearly named release APK
 
 ## Run locally
 
