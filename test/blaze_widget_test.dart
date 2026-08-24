@@ -24,6 +24,10 @@ void main() {
     expect(find.byType(PageView), findsOneWidget);
     expect(find.text('Garage'), findsNothing);
     expect(find.text('History'), findsNothing);
+    expect(
+      DefaultTextStyle.of(tester.element(find.text('BLAZE'))).style.decoration,
+      TextDecoration.none,
+    );
   });
 
   testWidgets('settings exposes the persistent Blaze Mode toggle',
@@ -37,10 +41,11 @@ void main() {
 
     expect(find.text('SETTINGS'), findsOneWidget);
     expect(find.text('Blaze Mode'), findsOneWidget);
-    expect(find.byType(Switch), findsOneWidget);
+    expect(find.text('Dashboard Textures'), findsOneWidget);
+    expect(find.byType(Switch), findsNWidgets(2));
     expect(controller.fireEffectsEnabled, isTrue);
 
-    tester.widget<Switch>(find.byType(Switch)).onChanged!(false);
+    tester.widget<Switch>(find.byType(Switch).first).onChanged!(false);
     await tester.pump();
     expect(controller.fireEffectsEnabled, isFalse);
   });
@@ -171,6 +176,25 @@ void main() {
     controller.setFireEffectsEnabled(true);
     final preferences = await SharedPreferences.getInstance();
     expect(preferences.getBool('fire_effects_enabled'), isTrue);
+    controller.dispose();
+  });
+
+  test('dashboard texture preference survives controller hydration', () async {
+    SharedPreferences.setMockInitialValues({
+      'texture_backgrounds_enabled': false,
+    });
+    final controller = BlazeController(
+      networkMonitor: const _FakeNetworkMonitor(
+        NetworkSnapshot(NetworkTransport.wifi),
+      ),
+    );
+
+    await controller.hydrate();
+    expect(controller.textureBackgroundsEnabled, isFalse);
+
+    controller.setTextureBackgroundsEnabled(true);
+    final preferences = await SharedPreferences.getInstance();
+    expect(preferences.getBool('texture_backgrounds_enabled'), isTrue);
     controller.dispose();
   });
 

@@ -21,6 +21,7 @@ class BlazeController extends ChangeNotifier {
   static const _savedThemesKey = 'saved_themes';
   static const _historyKey = 'history';
   static const _fireEffectsKey = 'fire_effects_enabled';
+  static const _textureBackgroundsKey = 'texture_backgrounds_enabled';
 
   final SpeedTestService _speedTestService;
   final NetworkMonitor _networkMonitor;
@@ -37,6 +38,7 @@ class BlazeController extends ChangeNotifier {
   String? errorMessage;
   NetworkSnapshot network = const NetworkSnapshot.unknown();
   bool fireEffectsEnabled = true;
+  bool textureBackgroundsEnabled = true;
   bool _blazeModeLatched = false;
   DateTime? _lastProgressNotify;
 
@@ -64,6 +66,8 @@ class BlazeController extends ChangeNotifier {
         storedHistory.map(_decodeResult).whereType<SpeedResult>().toList();
     latestResult = history.isEmpty ? null : history.first;
     fireEffectsEnabled = _preferences?.getBool(_fireEffectsKey) ?? true;
+    textureBackgroundsEnabled =
+        _preferences?.getBool(_textureBackgroundsKey) ?? true;
     if (latestResult != null &&
         math.max(latestResult!.download, latestResult!.upload) >= 800) {
       _blazeModeLatched = true;
@@ -89,6 +93,13 @@ class BlazeController extends ChangeNotifier {
     if (fireEffectsEnabled == enabled) return;
     fireEffectsEnabled = enabled;
     _preferences?.setBool(_fireEffectsKey, enabled);
+    notifyListeners();
+  }
+
+  void setTextureBackgroundsEnabled(bool enabled) {
+    if (textureBackgroundsEnabled == enabled) return;
+    textureBackgroundsEnabled = enabled;
+    _preferences?.setBool(_textureBackgroundsKey, enabled);
     notifyListeners();
   }
 

@@ -19,6 +19,9 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Clean generated APKs
+        run: flutter clean
+
       - name: Install dependencies
         run: flutter pub get
 

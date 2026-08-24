@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import 'controllers/blaze_controller.dart';
 import 'screens/home_screen.dart';
@@ -10,6 +11,10 @@ class BlazeApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Keep Inspector paint overlays out of hot-reloaded debug installs too.
+    debugPaintBaselinesEnabled = false;
+    debugPaintSizeEnabled = false;
+    debugRepaintRainbowEnabled = false;
     const orange = Color(0xFFFF6A3D);
     const ink = Colors.black;
     return MaterialApp(

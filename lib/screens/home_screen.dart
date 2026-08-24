@@ -73,12 +73,24 @@ class _HomeScreenState extends State<HomeScreen> {
         final theme = selectedProfile.theme;
         final result = controller.latestResult;
         final value = _gaugeValue(controller);
-        return ColoredBox(
+        return Material(
           color: Colors.black,
           child: Stack(
             fit: StackFit.expand,
             children: [
-              GarageBackdrop(accent: theme.primary),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 520),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                child: GarageBackdrop(
+                  key: ValueKey(
+                    '${selectedProfile.themeId}-${controller.textureBackgroundsEnabled}',
+                  ),
+                  accent: theme.primary,
+                  profileId: selectedProfile.themeId,
+                  enabled: controller.textureBackgroundsEnabled,
+                ),
+              ),
               FireBackdrop(
                 active: controller.blazeModeActive,
                 accent: theme.primary,
@@ -91,7 +103,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       _Header(
                         theme: theme,
-                        networkLabel: controller.network.label,
                         onSettings: () => _openSettings(controller, theme),
                       ),
                       const SizedBox(height: 14),
@@ -281,12 +292,10 @@ class _SwipeHint extends StatelessWidget {
 class _Header extends StatelessWidget {
   const _Header({
     required this.theme,
-    required this.networkLabel,
     required this.onSettings,
   });
 
   final dynamic theme;
-  final String networkLabel;
   final VoidCallback onSettings;
 
   @override
@@ -310,16 +319,6 @@ class _Header extends StatelessWidget {
           ),
         ),
         const Spacer(),
-        Text(
-          networkLabel,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.32),
-            fontSize: 8,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.9,
-          ),
-        ),
-        const SizedBox(width: 5),
         ChromeIconButton(
           tooltip: 'Settings',
           onPressed: onSettings,
@@ -371,81 +370,20 @@ class _SettingsSheet extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            Row(
-              children: [
-                Container(
-                  height: 44,
-                  width: 44,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF3B18).withOpacity(0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.local_fire_department_rounded,
-                    color: Color(0xFFFF6A35),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Blaze Mode',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Fire and haptic effect when live speed reaches 800 Mbps.',
-                        style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: 11,
-                          height: 1.35,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Switch.adaptive(
-                  value: controller.fireEffectsEnabled,
-                  activeColor: theme.primary,
-                  onChanged: controller.setFireEffectsEnabled,
-                ),
-              ],
+            _ToggleSetting(
+              icon: Icons.local_fire_department_rounded,
+              label: 'Blaze Mode',
+              value: controller.fireEffectsEnabled,
+              color: const Color(0xFFFF6A35),
+              onChanged: controller.setFireEffectsEnabled,
             ),
-            const SizedBox(height: 24),
-            Text(
-              'ACTIVE CONNECTION',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.34),
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.4,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              controller.network.label,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Wrap(
-              spacing: 7,
-              runSpacing: 7,
-              children: [
-                _NetworkChip('CELLULAR'),
-                _NetworkChip('WI-FI'),
-                _NetworkChip('HOTSPOT'),
-                _NetworkChip('VPN'),
-                _NetworkChip('ETHERNET'),
-              ],
+            const SizedBox(height: 12),
+            _ToggleSetting(
+              icon: Icons.texture_rounded,
+              label: 'Dashboard Textures',
+              value: controller.textureBackgroundsEnabled,
+              color: theme.primary,
+              onChanged: controller.setTextureBackgroundsEnabled,
             ),
           ],
         ),
@@ -454,27 +392,49 @@ class _SettingsSheet extends StatelessWidget {
   }
 }
 
-class _NetworkChip extends StatelessWidget {
-  const _NetworkChip(this.label);
+class _ToggleSetting extends StatelessWidget {
+  const _ToggleSetting({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.onChanged,
+  });
 
+  final IconData icon;
   final String label;
+  final bool value;
+  final Color color;
+  final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.055),
-        borderRadius: BorderRadius.circular(99),
+        color: Colors.white.withOpacity(0.045),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white54,
-          fontSize: 9,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
-        ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 21),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Switch.adaptive(
+            value: value,
+            activeColor: color,
+            onChanged: onChanged,
+          ),
+        ],
       ),
     );
   }
