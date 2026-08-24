@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import 'blaze_theme.dart';
 
+enum DialFrameStyle { none, chromeSquare }
+
 class DialNeedleSpec {
   const DialNeedleSpec({
     required this.pivot,
@@ -36,6 +38,8 @@ class DialProfile {
     this.assetPath,
     this.imageScale = 1,
     this.imageAlignment = Alignment.center,
+    this.imageFit = BoxFit.cover,
+    this.frameStyle = DialFrameStyle.none,
     this.needles = const [],
   });
 
@@ -45,6 +49,8 @@ class DialProfile {
   final String? assetPath;
   final double imageScale;
   final Alignment imageAlignment;
+  final BoxFit imageFit;
+  final DialFrameStyle frameStyle;
   final List<DialNeedleSpec> needles;
 
   BlazeTheme get theme => BlazeTheme.presets.firstWhere(
@@ -65,6 +71,7 @@ class DialProfile {
       name: 'V12 370',
       subtitle: 'Blue supercar',
       assetPath: 'assets/dials/lamborghini-clean.png',
+      frameStyle: DialFrameStyle.chromeSquare,
       needles: [
         DialNeedleSpec(
           pivot: Offset(0.50, 0.50),
@@ -83,6 +90,7 @@ class DialProfile {
       name: 'Rosso Center',
       subtitle: 'Central race dial',
       assetPath: 'assets/dials/ferrari-dashboard-clean.png',
+      frameStyle: DialFrameStyle.chromeSquare,
       needles: [
         DialNeedleSpec(
           pivot: Offset(0.50, 0.515),
@@ -103,6 +111,7 @@ class DialProfile {
       assetPath: 'assets/dials/bmw-classic-clean.png',
       imageScale: 1.12,
       imageAlignment: Alignment(0, 0.28),
+      frameStyle: DialFrameStyle.chromeSquare,
       needles: [
         DialNeedleSpec(
           pivot: Offset(0.50, 0.572),
@@ -122,6 +131,7 @@ class DialProfile {
       subtitle: 'High-RPM sweep',
       assetPath: 'assets/dials/ferrari-tach-clean.png',
       imageScale: 1.04,
+      frameStyle: DialFrameStyle.chromeSquare,
       needles: [
         DialNeedleSpec(
           pivot: Offset(0.50, 0.76),
@@ -140,6 +150,7 @@ class DialProfile {
       name: 'Heritage 140',
       subtitle: 'Orange analog',
       assetPath: 'assets/dials/classic-red-clean.png',
+      frameStyle: DialFrameStyle.chromeSquare,
       needles: [
         DialNeedleSpec(
           pivot: Offset(0.50, 0.57),
@@ -157,7 +168,8 @@ class DialProfile {
       themeId: 'digital-dual',
       name: 'Twin Digital',
       subtitle: 'Dual live needles',
-      assetPath: 'assets/dials/digital-dual-clean.png',
+      assetPath: 'assets/dials/digital-dual-cutout.png',
+      imageFit: BoxFit.contain,
       needles: [
         DialNeedleSpec(
           pivot: Offset(0.238, 0.506),

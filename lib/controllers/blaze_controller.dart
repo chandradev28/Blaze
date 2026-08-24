@@ -39,10 +39,12 @@ class BlazeController extends ChangeNotifier {
   NetworkSnapshot network = const NetworkSnapshot.unknown();
   bool fireEffectsEnabled = true;
   bool textureBackgroundsEnabled = true;
+  bool _smokeModeLatched = false;
   bool _blazeModeLatched = false;
   DateTime? _lastProgressNotify;
 
   bool get blazeModeActive => fireEffectsEnabled && _blazeModeLatched;
+  bool get smokeModeActive => fireEffectsEnabled && _smokeModeLatched;
 
   double get dialMax {
     final observed = math.max(liveSpeed, peakSpeed);
@@ -68,9 +70,10 @@ class BlazeController extends ChangeNotifier {
     fireEffectsEnabled = _preferences?.getBool(_fireEffectsKey) ?? true;
     textureBackgroundsEnabled =
         _preferences?.getBool(_textureBackgroundsKey) ?? true;
-    if (latestResult != null &&
-        math.max(latestResult!.download, latestResult!.upload) >= 800) {
-      _blazeModeLatched = true;
+    if (latestResult != null) {
+      final storedPeak = math.max(latestResult!.download, latestResult!.upload);
+      _smokeModeLatched = storedPeak >= 100;
+      _blazeModeLatched = storedPeak >= 800;
     }
     await _refreshNetwork();
     await _networkSubscription?.cancel();
@@ -166,6 +169,7 @@ class BlazeController extends ChangeNotifier {
     gaugeValue = 0;
     liveSpeed = 0;
     peakSpeed = 0;
+    _smokeModeLatched = false;
     _blazeModeLatched = false;
     _lastProgressNotify = null;
     latestResult = null;
@@ -187,17 +191,21 @@ class BlazeController extends ChangeNotifier {
         },
         onProgress: (progress) {
           gaugeValue = progress.fraction;
-          var blazeModeChanged = false;
+          var effectsChanged = false;
           if (progress.speedMbps > 0) {
             liveSpeed = progress.speedMbps;
             peakSpeed = math.max(peakSpeed, progress.speedMbps);
+            if (progress.speedMbps >= 100 && !_smokeModeLatched) {
+              _smokeModeLatched = true;
+              effectsChanged = true;
+            }
             if (progress.speedMbps >= 800 && !_blazeModeLatched) {
               _blazeModeLatched = true;
-              blazeModeChanged = true;
+              effectsChanged = true;
             }
           }
           final now = DateTime.now();
-          if (!blazeModeChanged &&
+          if (!effectsChanged &&
               progress.fraction < 1 &&
               _lastProgressNotify != null &&
               now.difference(_lastProgressNotify!).inMilliseconds < 42) {
@@ -208,9 +216,9 @@ class BlazeController extends ChangeNotifier {
         },
       );
       latestResult = result;
-      if (math.max(result.download, result.upload) >= 800) {
-        _blazeModeLatched = true;
-      }
+      final resultPeak = math.max(result.download, result.upload);
+      if (resultPeak >= 100) _smokeModeLatched = true;
+      if (resultPeak >= 800) _blazeModeLatched = true;
       liveSpeed = result.download;
       peakSpeed = math.max(peakSpeed, result.download);
       history = [result, ...history].take(20).toList();
@@ -219,6 +227,7 @@ class BlazeController extends ChangeNotifier {
       notifyListeners();
     } catch (error) {
       phase = TestPhase.error;
+      _smokeModeLatched = false;
       _blazeModeLatched = false;
       errorMessage = error is SpeedTestException
           ? error.message
@@ -233,6 +242,7 @@ class BlazeController extends ChangeNotifier {
     liveSpeed = 0;
     peakSpeed = 0;
     errorMessage = null;
+    _smokeModeLatched = false;
     _blazeModeLatched = false;
     notifyListeners();
   }

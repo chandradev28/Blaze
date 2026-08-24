@@ -384,11 +384,13 @@ class GarageBackdropPainter extends CustomPainter {
 class ChromeGaugeStage extends StatelessWidget {
   const ChromeGaugeStage({
     required this.accent,
+    required this.squareFrame,
     required this.child,
     super.key,
   });
 
   final Color accent;
+  final bool squareFrame;
   final Widget child;
 
   @override
@@ -398,9 +400,21 @@ class ChromeGaugeStage extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           CustomPaint(
-            painter: ChromeGaugeFramePainter(accent: accent),
+            painter: ChromeGaugeFramePainter(
+              accent: accent,
+              squareFrame: squareFrame,
+            ),
           ),
-          Padding(padding: const EdgeInsets.all(2), child: child),
+          Padding(
+            padding: EdgeInsets.all(squareFrame ? 7 : 2),
+            child: child,
+          ),
+          if (squareFrame)
+            IgnorePointer(
+              child: CustomPaint(
+                painter: ChromeSquareFramePainter(accent: accent),
+              ),
+            ),
         ],
       ),
     );
@@ -408,12 +422,28 @@ class ChromeGaugeStage extends StatelessWidget {
 }
 
 class ChromeGaugeFramePainter extends CustomPainter {
-  const ChromeGaugeFramePainter({required this.accent});
+  const ChromeGaugeFramePainter({
+    required this.accent,
+    required this.squareFrame,
+  });
 
   final Color accent;
+  final bool squareFrame;
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (squareFrame) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          (Offset.zero & size).deflate(4),
+          const Radius.circular(25),
+        ),
+        Paint()
+          ..color = Colors.black.withOpacity(0.78)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16),
+      );
+      return;
+    }
     final center = Offset(size.width / 2, size.height * 0.51);
     final radius = math.min(size.width, size.height) * 0.465;
     canvas.drawCircle(
@@ -458,6 +488,76 @@ class ChromeGaugeFramePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant ChromeGaugeFramePainter oldDelegate) =>
+      oldDelegate.accent != accent || oldDelegate.squareFrame != squareFrame;
+}
+
+class ChromeSquareFramePainter extends CustomPainter {
+  const ChromeSquareFramePainter({required this.accent});
+
+  final Color accent;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bounds = Offset.zero & size;
+    final outer = RRect.fromRectAndRadius(
+      bounds.deflate(2.5),
+      const Radius.circular(25),
+    );
+    canvas.drawRRect(
+      outer,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 5
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF202326),
+            Color(0xFFE9EAEB),
+            Color(0xFF5A5E62),
+            Color(0xFFF5F6F6),
+            Color(0xFF292C2F),
+          ],
+          stops: [0, 0.18, 0.48, 0.72, 1],
+        ).createShader(bounds),
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        bounds.deflate(6),
+        const Radius.circular(21),
+      ),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2
+        ..color = Colors.black.withOpacity(0.92),
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        bounds.deflate(8.5),
+        const Radius.circular(19),
+      ),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.9
+        ..color = accent.withOpacity(0.34),
+    );
+
+    const cornerLength = 26.0;
+    final highlight = Paint()
+      ..strokeWidth = 1.3
+      ..strokeCap = StrokeCap.round
+      ..color = Colors.white.withOpacity(0.48);
+    canvas.drawLine(
+        const Offset(15, 4), const Offset(15 + cornerLength, 4), highlight);
+    canvas.drawLine(
+      Offset(size.width - 15 - cornerLength, size.height - 4),
+      Offset(size.width - 15, size.height - 4),
+      highlight,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant ChromeSquareFramePainter oldDelegate) =>
       oldDelegate.accent != accent;
 }
 

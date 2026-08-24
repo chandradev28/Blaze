@@ -63,6 +63,17 @@ void main() {
         BlazeTheme.presets
             .every((theme) => theme.gaugeStyle == GaugeStyle.classic),
         isTrue);
+    expect(
+      DialProfile.presets
+          .where((profile) => profile.frameStyle == DialFrameStyle.chromeSquare)
+          .length,
+      5,
+    );
+    final twinDigital = DialProfile.presets.firstWhere(
+      (profile) => profile.themeId == 'digital-dual',
+    );
+    expect(twinDigital.assetPath, endsWith('digital-dual-cutout.png'));
+    expect(twinDigital.imageFit, BoxFit.contain);
   });
 
   test('speed results are stored and migrated as decimal Mbps', () {
@@ -157,12 +168,31 @@ void main() {
     );
 
     await controller.startTest();
+    expect(controller.smokeModeActive, isTrue);
     expect(controller.blazeModeActive, isTrue);
 
     controller.setFireEffectsEnabled(false);
     expect(controller.blazeModeActive, isFalse);
     controller.setFireEffectsEnabled(true);
     expect(controller.blazeModeActive, isTrue);
+  });
+
+  test('100 Mbps latches burnout smoke before Blaze Mode', () async {
+    final controller = BlazeController(
+      speedTestService: _ThresholdSpeedTest(120),
+      networkMonitor: const _FakeNetworkMonitor(
+        NetworkSnapshot(NetworkTransport.mobile),
+      ),
+    );
+
+    await controller.startTest();
+    expect(controller.smokeModeActive, isTrue);
+    expect(controller.blazeModeActive, isFalse);
+
+    controller.setFireEffectsEnabled(false);
+    expect(controller.smokeModeActive, isFalse);
+    controller.setFireEffectsEnabled(true);
+    expect(controller.smokeModeActive, isTrue);
   });
 
   test('Blaze Mode preference survives controller hydration', () async {
@@ -228,17 +258,21 @@ class _FakeNetworkMonitor implements NetworkMonitor {
 }
 
 class _ThresholdSpeedTest extends SpeedTestService {
+  _ThresholdSpeedTest([this.speed = 820]);
+
+  final double speed;
+
   @override
   Future<SpeedResult> run({
     required void Function(TestPhase phase) onPhase,
     required void Function(SpeedTestProgress progress) onProgress,
   }) async {
     onPhase(TestPhase.download);
-    onProgress(const SpeedTestProgress(fraction: 0.5, speedMbps: 820));
+    onProgress(SpeedTestProgress(fraction: 0.5, speedMbps: speed));
     onPhase(TestPhase.finished);
     return SpeedResult(
       timestamp: DateTime(2026, 8, 24),
-      download: 820,
+      download: speed,
       upload: 90,
       ping: 8,
       jitter: 1,

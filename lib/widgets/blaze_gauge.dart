@@ -147,7 +147,7 @@ class _BlazeGaugeState extends State<BlazeGauge> with TickerProviderStateMixin {
                       children: [
                         Image.asset(
                           profile.assetPath!,
-                          fit: BoxFit.cover,
+                          fit: profile.imageFit,
                           filterQuality: FilterQuality.high,
                         ),
                         CustomPaint(

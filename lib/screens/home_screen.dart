@@ -8,6 +8,7 @@ import '../models/speed_result.dart';
 import '../services/speed_test_service.dart';
 import '../widgets/blaze_gauge.dart';
 import '../widgets/blaze_ui.dart';
+import '../widgets/burnout_smoke_backdrop.dart';
 import '../widgets/fire_backdrop.dart';
 import '../widgets/garage_chrome.dart';
 
@@ -91,6 +92,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   enabled: controller.textureBackgroundsEnabled,
                 ),
               ),
+              BurnoutSmokeBackdrop(
+                active: controller.smokeModeActive,
+                accent: theme.primary,
+              ),
               FireBackdrop(
                 active: controller.blazeModeActive,
                 accent: theme.primary,
@@ -147,16 +152,38 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ),
                                     ],
                                   )
-                                : Text(
-                                    selectedProfile.name.toUpperCase(),
-                                    key: ValueKey(selectedProfile.themeId),
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.58),
-                                      fontSize: 10,
-                                      letterSpacing: 1.6,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
+                                : controller.smokeModeActive
+                                    ? Row(
+                                        key: const ValueKey('burnout-mode'),
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.cloud_rounded,
+                                            color: Colors.blueGrey.shade100,
+                                            size: 14,
+                                          ),
+                                          const SizedBox(width: 5),
+                                          const Text(
+                                            'BURNOUT',
+                                            style: TextStyle(
+                                              color: Color(0xFFDDE1E4),
+                                              fontSize: 10,
+                                              letterSpacing: 1.4,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    : Text(
+                                        selectedProfile.name.toUpperCase(),
+                                        key: ValueKey(selectedProfile.themeId),
+                                        style: TextStyle(
+                                          color: Colors.white.withOpacity(0.58),
+                                          fontSize: 10,
+                                          letterSpacing: 1.6,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
                           ),
                         ],
                       ),
@@ -165,6 +192,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         height: 374,
                         child: ChromeGaugeStage(
                           accent: theme.primary,
+                          squareFrame: selectedProfile.frameStyle ==
+                              DialFrameStyle.chromeSquare,
                           child: PageView.builder(
                             controller: _profileController,
                             itemCount: _profiles.length,
