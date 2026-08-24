@@ -18,14 +18,17 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 120));
 
-    expect(find.text('BLAZE'), findsOneWidget);
+    expect(find.byKey(const ValueKey('blaze-logo')), findsOneWidget);
+    expect(find.text('BLAZE'), findsNothing);
     expect(find.text('ACCELERATE'), findsOneWidget);
     expect(find.text('CLASSIC 140'), findsOneWidget);
     expect(find.byType(PageView), findsOneWidget);
     expect(find.text('Garage'), findsNothing);
     expect(find.text('History'), findsNothing);
     expect(
-      DefaultTextStyle.of(tester.element(find.text('BLAZE'))).style.decoration,
+      DefaultTextStyle.of(
+        tester.element(find.text('READY TO TEST')),
+      ).style.decoration,
       TextDecoration.none,
     );
   });

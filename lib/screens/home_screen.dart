@@ -302,20 +302,30 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        SizedBox(
-          height: 38,
-          width: 30,
-          child: CustomPaint(
-            painter: _BlazeMarkPainter(color: theme.primary),
+        Container(
+          key: const ValueKey('blaze-logo'),
+          height: 56,
+          width: 56,
+          padding: const EdgeInsets.all(1),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(color: Colors.white.withOpacity(0.12)),
+            boxShadow: [
+              BoxShadow(
+                color: theme.primary.withOpacity(0.22),
+                blurRadius: 18,
+                spreadRadius: -4,
+              ),
+            ],
           ),
-        ),
-        const SizedBox(width: 9),
-        const Text(
-          'BLAZE',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 4.2,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(15),
+            child: Image.asset(
+              'assets/branding/blaze_logo.png',
+              fit: BoxFit.cover,
+              filterQuality: FilterQuality.high,
+              semanticLabel: 'Blaze',
+            ),
           ),
         ),
         const Spacer(),
@@ -438,44 +448,6 @@ class _ToggleSetting extends StatelessWidget {
       ),
     );
   }
-}
-
-class _BlazeMarkPainter extends CustomPainter {
-  const _BlazeMarkPainter({required this.color});
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = Path()
-      ..moveTo(size.width * 0.66, 0)
-      ..lineTo(size.width * 0.17, size.height * 0.56)
-      ..lineTo(size.width * 0.47, size.height * 0.53)
-      ..lineTo(size.width * 0.25, size.height)
-      ..lineTo(size.width * 0.86, size.height * 0.37)
-      ..lineTo(size.width * 0.55, size.height * 0.40)
-      ..close();
-    canvas.drawPath(
-      path,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Colors.white, color, const Color(0xFFFF3B30)],
-        ).createShader(Offset.zero & size),
-    );
-    canvas.drawPath(
-      path,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1
-        ..color = Colors.white.withOpacity(0.45),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _BlazeMarkPainter oldDelegate) =>
-      oldDelegate.color != color;
 }
 
 class _StatusPill extends StatelessWidget {
